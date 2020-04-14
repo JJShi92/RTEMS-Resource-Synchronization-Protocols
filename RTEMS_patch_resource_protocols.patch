@@ -1,0 +1,5604 @@
+diff --git a/cpukit/Makefile.am b/cpukit/Makefile.am
+index 01ee40980f..a7493bdb3b 100644
+--- a/cpukit/Makefile.am
++++ b/cpukit/Makefile.am
+@@ -772,6 +772,8 @@ librtemscpu_a_SOURCES += rtems/src/semflush.c
+ librtemscpu_a_SOURCES += rtems/src/semident.c
+ librtemscpu_a_SOURCES += rtems/src/semobtain.c
+ librtemscpu_a_SOURCES += rtems/src/semrelease.c
++librtemscpu_a_SOURCES += rtems/src/semticket.c
++librtemscpu_a_SOURCES += rtems/src/semsetprocessor.c
+ librtemscpu_a_SOURCES += rtems/src/semsetpriority.c
+ librtemscpu_a_SOURCES += rtems/src/signalcatch.c
+ librtemscpu_a_SOURCES += rtems/src/signalsend.c
+diff --git a/cpukit/headers.am b/cpukit/headers.am
+index 008b7ccbe5..5ff1ff8656 100644
+--- a/cpukit/headers.am
++++ b/cpukit/headers.am
+@@ -333,8 +333,20 @@ include_rtems_score_HEADERS += include/rtems/score/isrlock.h
+ include_rtems_score_HEADERS += include/rtems/score/mpci.h
+ include_rtems_score_HEADERS += include/rtems/score/mpciimpl.h
+ include_rtems_score_HEADERS += include/rtems/score/mppkt.h
++include_rtems_score_HEADERS += include/rtems/score/dpcp.h
++include_rtems_score_HEADERS += include/rtems/score/dpcpimpl.h
++include_rtems_score_HEADERS += include/rtems/score/mpcp.h
++include_rtems_score_HEADERS += include/rtems/score/mpcpimpl.h
+ include_rtems_score_HEADERS += include/rtems/score/mrsp.h
+ include_rtems_score_HEADERS += include/rtems/score/mrspimpl.h
++include_rtems_score_HEADERS += include/rtems/score/fmlps.h
++include_rtems_score_HEADERS += include/rtems/score/fmlpsimpl.h
++include_rtems_score_HEADERS += include/rtems/score/fmlpl.h
++include_rtems_score_HEADERS += include/rtems/score/fmlplimpl.h
++include_rtems_score_HEADERS += include/rtems/score/dflpl.h
++include_rtems_score_HEADERS += include/rtems/score/dflplimpl.h
++include_rtems_score_HEADERS += include/rtems/score/hdga.h
++include_rtems_score_HEADERS += include/rtems/score/hdgaimpl.h
+ include_rtems_score_HEADERS += include/rtems/score/muteximpl.h
+ include_rtems_score_HEADERS += include/rtems/score/object.h
+ include_rtems_score_HEADERS += include/rtems/score/objectdata.h
+diff --git a/cpukit/include/rtems/confdefs.h b/cpukit/include/rtems/confdefs.h
+index 5eb5425283..4d3df7bf32 100644
+--- a/cpukit/include/rtems/confdefs.h
++++ b/cpukit/include/rtems/confdefs.h
+@@ -1994,6 +1994,60 @@ extern rtems_initialization_tasks_table Initialization_tasks[];
+   #define CONFIGURE_MAXIMUM_SEMAPHORES                 0
+ #endif
+ 
++/*
++ * This macro is calculated to specify the memory required for
++ * Classic API Semaphores using FMLPL. This is only available in
++ * SMP configurations.
++ */
++#if !defined(RTEMS_SMP) || \
++  !defined(CONFIGURE_MAXIMUM_FMLPL_SEMAPHORES)
++  #define _CONFIGURE_MEMORY_FOR_FMLPL_SEMAPHORES 0
++#else
++  #define _CONFIGURE_MEMORY_FOR_FMLPL_SEMAPHORES \
++    CONFIGURE_MAXIMUM_FMLPL_SEMAPHORES * \
++      _Configure_From_workspace( \
++	sizeof(FMLPL_Control) + \
++	sizeof(RBTree_Node) * CONFIGURE_MAXIMUM_TASKS + \
++	sizeof(Priority_Control) * CONFIGURE_MAXIMUM_TASKS \
++      )
++#endif
++
++/*
++ * This macro is calculated to specify the memory required for
++ * Classic API Semaphores using DFLPL. This is only available in
++ * SMP configurations.
++ */
++#if !defined(RTEMS_SMP) || \
++  !defined(CONFIGURE_MAXIMUM_DFLPL_SEMAPHORES)
++  #define _CONFIGURE_MEMORY_FOR_DFLPL_SEMAPHORES 0
++#else
++  #define _CONFIGURE_MEMORY_FOR_DFLPL_SEMAPHORES \
++    CONFIGURE_MAXIMUM_DFLPL_SEMAPHORES * \
++      _Configure_From_workspace( \
++	sizeof(DFLPL_Control) + \
++	sizeof(RBTree_Node) * CONFIGURE_MAXIMUM_TASKS + \
++	sizeof(Priority_Control) * CONFIGURE_MAXIMUM_TASKS \
++      )
++#endif
++/*
++ * This macro is calculated to specify the memory required for
++ * Classic API Semaphores using HDGA. This is only available in
++ * SMP configurations.
++ */
++#if !defined(RTEMS_SMP) || \
++  !defined(CONFIGURE_MAXIMUM_HDGA_SEMAPHORES)
++  #define _CONFIGURE_MEMORY_FOR_HDGA_SEMAPHORES 0
++#else
++  #define _CONFIGURE_MEMORY_FOR_HDGA_SEMAPHORES \
++    CONFIGURE_MAXIMUM_HDGA_SEMAPHORES * \
++      _Configure_From_workspace( \
++	sizeof(HDGA_Control) + \
++	sizeof(RBTree_Node) * CONFIGURE_MAXIMUM_TASKS + \
++	sizeof(Ticket_Control) * CONFIGURE_MAXIMUM_TASKS \
++      )
++#endif
++
++
+ /*
+  * This macro is calculated to specify the memory required for
+  * Classic API Semaphores using MRSP. This is only available in
+@@ -2010,6 +2064,22 @@ extern rtems_initialization_tasks_table Initialization_tasks[];
+       )
+ #endif
+ 
++/*
++ * This macro is calculated to specify the memory required for
++ * Classic API Semaphores using DPCP. This is only available in
++ * SMP configurations.
++ */
++  #if !defined(RTEMS_SMP) || \
++    !defined(CONFIGURE_MAXIMUM_MPCP_SEMAPHORES)
++  #define _CONFIGURE_MEMORY_FOR_MPCP_SEMAPHORES 0
++  #else
++  #define _CONFIGURE_MEMORY_FOR_MPCP_SEMAPHORES \
++      CONFIGURE_MAXIMUM_MPCP_SEMAPHORES * \
++        _Configure_From_workspace( \
++          RTEMS_ARRAY_SIZE(_Scheduler_Table) * sizeof(Priority_Control) \
++        )
++  #endif
++
+ #ifndef CONFIGURE_MAXIMUM_MESSAGE_QUEUES
+   /**
+    * This configuration parameter specifies the maximum number of
+@@ -2508,6 +2578,10 @@ struct _reent *__getreent(void)
+    _CONFIGURE_MEMORY_FOR_TASKS( \
+      _CONFIGURE_POSIX_THREADS, _CONFIGURE_POSIX_THREADS) + \
+    _CONFIGURE_MEMORY_FOR_MRSP_SEMAPHORES + \
++   _CONFIGURE_MEMORY_FOR_FMLPL_SEMAPHORES + \
++   _CONFIGURE_MEMORY_FOR_DFLPL_SEMAPHORES + \
++   _CONFIGURE_MEMORY_FOR_MPCP_SEMAPHORES + \
++   _CONFIGURE_MEMORY_FOR_HDGA_SEMAPHORES + \
+    _CONFIGURE_MEMORY_FOR_POSIX_MESSAGE_QUEUES( \
+      CONFIGURE_MAXIMUM_POSIX_MESSAGE_QUEUES) + \
+    _CONFIGURE_MEMORY_FOR_POSIX_SEMAPHORES( \
+diff --git a/cpukit/include/rtems/rtems/attr.h b/cpukit/include/rtems/rtems/attr.h
+index abc9da08cd..40ead16dc2 100644
+--- a/cpukit/include/rtems/rtems/attr.h
++++ b/cpukit/include/rtems/rtems/attr.h
+@@ -150,6 +150,92 @@ typedef uint32_t   rtems_attribute;
+  */
+ #define RTEMS_MULTIPROCESSOR_RESOURCE_SHARING 0x00000100
+ 
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Distributed Priority Ceiling Protocol.
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_DISTRIBUTED_PRIORITY_CEILING 0x00004000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Distributed Priority Ceiling Protocol.
++ */
++#define RTEMS_NO_DISTRIBUTED_PRIORITY_CEILING 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Flexible Multiprocessor Locking Protocol (short).
++ */
++#define RTEMS_NO_FLEXIBLE_MULTIPROCESSOR_LOCKING_SHORT 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Flexible Multiprocessor Locking Protocol (short).
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_SHORT 0x00000200
++
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Flexible Multiprocessor Locking Protocol (long).
++ */
++#define RTEMS_NO_FLEXIBLE_MULTIPROCESSOR_LOCKING_LONG 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Flexible Multiprocessor Locking Protocol (long).
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_LONG 0x00000400
++
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Distributed Flexible Locking Long.
++ */
++#define RTEMS_NO_DISTRIBUTED_FLEXIBLE_LOCKING_LONG 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Distributed Flexible Locking Long.
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_DISTRIBUTED_FLEXIBLE_LOCKING_LONG 0x00000800
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Multiprocessor Priority Ceiling Protocol.
++ */
++#define RTEMS_NO_MULTIPROCESSOR_PRIORITY_CEILING 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Multiprocessor Priority Ceiling Protocol.
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_MULTIPROCESSOR_PRIORITY_CEILING 0x00002000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will NOT use the Hyperperiod Dependency Graph Approach.
++ */
++#define RTEMS_NO_HYPERPERIOD_DEPENDENCY_GRAPH_APPROACH 0x00000000
++
++/**
++ *  This attribute constant indicates that the Classic API Semaphore instance
++ *  created will use the Hyperperiod Dependency Graph Approach.
++ *
++ *  @note The semaphore instance must be a binary semaphore.
++ */
++#define RTEMS_HYPERPERIOD_DEPENDENCY_GRAPH_APPROACH 0x00001000
++
+ /******************** RTEMS Barrier Specific Attributes ********************/
+ 
+ /**
+diff --git a/cpukit/include/rtems/rtems/sem.h b/cpukit/include/rtems/rtems/sem.h
+index 3dcdfbfda8..544e709e46 100644
+--- a/cpukit/include/rtems/rtems/sem.h
++++ b/cpukit/include/rtems/rtems/sem.h
+@@ -119,6 +119,45 @@ rtems_status_code rtems_semaphore_obtain(
+   rtems_interval timeout
+ );
+ 
++/**
++ * @brief RTEMS Semaphore Set Processor
++ *
++ * Sets the synchronization processor for the DFLPL and DPCP semaphores. It
++ * attempts to obtain a unit from the semaphore associated with ID.
++ *
++ *
++ * @param[in] id is the semaphore id
++ * @param[in] cpu is the number of the processor in the system
++ *
++ * @retval This method returns RTEMS_SUCCESSFUL if there was not an
++ *         error. Otherwise, a status code is returned indicating the
++ *         source of the error.
++ */
++rtems_status_code rtems_semaphore_set_processor(
++  rtems_id id,
++  int      cpu
++);
++
++/**
++ * @brief RTEMS Semaphore Set Ticket
++ *
++ * Sets ticket order for the hdga semaphore.
++ *
++ *
++ * @param[in] id is the semaphore id
++ * @param[in] id is the thread id
++ * @param[in] cpu is the number of the processor in the system
++ *
++ * @retval This method returns RTEMS_SUCCESSFUL if there was not an
++ *         error. Otherwise, a status code is returned indicating the
++ *         source of the error.
++ */
++rtems_status_code rtems_semaphore_ticket(
++  rtems_id id,
++  rtems_id tid,
++  int 	   position
++);
++
+ /**
+  *  @brief RTEMS Semaphore Release
+  *
+diff --git a/cpukit/include/rtems/rtems/semdata.h b/cpukit/include/rtems/rtems/semdata.h
+index d2275e5dfe..9abf65c97e 100644
+--- a/cpukit/include/rtems/rtems/semdata.h
++++ b/cpukit/include/rtems/rtems/semdata.h
+@@ -22,7 +22,13 @@
+ #include <rtems/score/coremutex.h>
+ #include <rtems/score/coresem.h>
+ #include <rtems/score/mrsp.h>
++#include <rtems/score/dpcp.h>
++#include <rtems/score/fmlps.h>
++#include <rtems/score/fmlpl.h>
++#include <rtems/score/hdga.h>
+ #include <rtems/score/object.h>
++#include <rtems/score/dflpl.h>
++#include <rtems/score/mpcp.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -70,6 +76,12 @@ typedef struct {
+ 
+ #if defined(RTEMS_SMP)
+     MRSP_Control MRSP;
++    DPCP_Control DPCP;
++    FMLPS_Control FMLPS;
++    FMLPL_Control FMLPL;
++    DFLPL_Control DFLPL;
++    HDGA_Control HDGA;
++    MPCP_Control MPCP;
+ #endif
+   } Core_control;
+ 
+@@ -78,7 +90,7 @@ typedef struct {
+    *
+    * @see Semaphore_Variant.
+    */
+-  unsigned int variant : 3;
++  unsigned int variant : 4;
+ 
+   /**
+    * @brief The semaphore thread queue discipline.
+diff --git a/cpukit/include/rtems/rtems/semimpl.h b/cpukit/include/rtems/rtems/semimpl.h
+index dd6a8b4e48..ba07bdd36e 100644
+--- a/cpukit/include/rtems/rtems/semimpl.h
++++ b/cpukit/include/rtems/rtems/semimpl.h
+@@ -21,6 +21,12 @@
+ #include <rtems/score/coremuteximpl.h>
+ #include <rtems/score/coresemimpl.h>
+ #include <rtems/score/mrspimpl.h>
++#include <rtems/score/dpcpimpl.h>
++#include <rtems/score/fmlpsimpl.h>
++#include <rtems/score/fmlplimpl.h>
++#include <rtems/score/dflplimpl.h>
++#include <rtems/score/hdgaimpl.h>
++#include <rtems/score/mpcpimpl.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -47,7 +53,13 @@ typedef enum {
+   SEMAPHORE_VARIANT_COUNTING
+ #if defined(RTEMS_SMP)
+   ,
+-  SEMAPHORE_VARIANT_MRSP
++  SEMAPHORE_VARIANT_MRSP,
++  SEMAPHORE_VARIANT_DPCP,
++  SEMAPHORE_VARIANT_FMLPS,
++  SEMAPHORE_VARIANT_FMLPL,
++  SEMAPHORE_VARIANT_DFLPL,
++  SEMAPHORE_VARIANT_HDGA,
++  SEMAPHORE_VARIANT_MPCP
+ #endif
+ } Semaphore_Variant;
+ 
+diff --git a/cpukit/include/rtems/score/dflpl.h b/cpukit/include/rtems/score/dflpl.h
+new file mode 100644
+index 0000000000..f8e06960c7
+--- /dev/null
++++ b/cpukit/include/rtems/score/dflpl.h
+@@ -0,0 +1,48 @@
++/*
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_DFLPL_H
++#define _RTEMS_SCORE_DFLPL_H
++
++#include <rtems/score/cpuopts.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++#include <rtems/score/percpu.h>
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @brief DFLPL control block.
++ */
++typedef struct {
++  // our thread queue
++  Thread_queue_Control Wait_queue;
++
++  // the priority node, which is assigned to the priority owner
++  Priority_Node root_node;
++
++  // our array for keeping the priorities of all tasks
++  Priority_Control *priority_array;
++
++  // current first free position
++  int first_free_slot;
++
++  //Pointer to the synchronization cpu control structure
++  Per_CPU_Control *pu;
++} DFLPL_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_DFLPL_H */
+diff --git a/cpukit/include/rtems/score/dflplimpl.h b/cpukit/include/rtems/score/dflplimpl.h
+new file mode 100644
+index 0000000000..a524ee9d0a
+--- /dev/null
++++ b/cpukit/include/rtems/score/dflplimpl.h
+@@ -0,0 +1,594 @@
++
++
++
++#ifndef _RTEMS_SCORE_DFLPLIMPL_H
++#define _RTEMS_SCORE_DFLPLIMPL_H
++
++#include "dflpl.h"
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreDFLPL
++ *
++ * @{
++ */
++
++#define DFLPL_TQ_OPERATIONS &_Thread_queue_Operations_FIFO
++
++/**
++ * @brief Migrates Thread to an synchronization processor.
++ *
++ * @param executing The executing Thread
++ * @param dflpl the semaphore control block
++ * @param migration_priority the priority of the task in the foreign scheduler instance
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Migrate(
++    Thread_Control *executing,
++    DFLPL_Control  *dflpl,
++    Priority_Node  *migration_priority
++)
++{
++
++  _Scheduler_Migrate_To(executing, dflpl->pu, migration_priority);
++}
++
++/**
++ * @brief Migrates Thread back to the application processor.
++ *
++ * @param executing The executing Thread
++ * @param dflpl the semaphore control block
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Migrate_Back(
++  Thread_Control *executing,
++  DFLPL_Control  *dflpl
++)
++{
++  _Scheduler_Migrate_Back( executing, dflpl->pu );
++
++}
++
++/**
++ * @brief Acquires the lock for the queue_context
++ *
++ * @param dflpl The DFLPL control for the operation.
++ * @param queue_contest the queue_context of the semphore
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Acquire_critical(
++  DFLPL_Control        *dflpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Acquire_critical( &dflpl->Wait_queue, queue_context );
++}
++
++
++/**
++ * @brief Releases the lock for the queue_context
++ *
++ * @param dflpl The DFLPL control for the operation.
++ * @param queue_contest the queue_context of the semphore
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Release(
++  DFLPL_Control        *dflpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Release( &dflpl->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Sets the synchronization CPU of the DFLPL Control
++ *
++ * @param dpcp The semaphore control block-
++ * @param cpu The synchronization processor it changes to.
++ * @param queue_context struct to secure sempahore access
++ */
++
++RTEMS_INLINE_ROUTINE void _DFLPL_Set_CPU(
++  DFLPL_Control        *dflpl,
++  Per_CPU_Control      *cpu,
++  Thread_queue_Context *queue_context
++)
++{
++  _DFLPL_Acquire_critical(dflpl, queue_context);
++  dflpl->pu = cpu;
++  _DFLPL_Release(dflpl, queue_context);
++
++}
++/**
++ * @brief Gets the current owner of the semaphore
++ * @param dflpl The DFLPL control for the operation.
++ *
++ * @return The current owner otherwise NULL
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_DFLPL_Get_owner(
++  const DFLPL_Control *dflpl
++)
++{
++  return dflpl->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets the current owner of the semaphore in the semaphore data structure
++ *
++ * @param dflpl The DFLPL control for the operation.
++ * @param executing The new owner
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Set_owner(
++  DFLPL_Control  *dflpl,
++  Thread_Control *owner
++)
++{
++  dflpl->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Gets the priority of the executing task in its home scheduler instance
++ *
++ * @param executing The new owner
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _DFLPL_Get_priority(
++  const Thread_Control *the_thread
++)
++{
++  const Scheduler_Node    *scheduler_node;
++  const Scheduler_Control *scheduler;
++  Priority_Control         core_priority;
++
++  scheduler = _Thread_Scheduler_get_home( the_thread );
++  scheduler_node = _Thread_Scheduler_get_home_node( the_thread );
++
++  core_priority = _Priority_Get_priority( &scheduler_node->Wait.Priority );
++  return _RTEMS_Priority_From_core( scheduler, core_priority );
++}
++
++/**
++ * @brief Changes the priority of the owner of the semaphore in a different scheduler instance
++ *
++ * @param executing The owner
++ * @param new_prio the new priority of the owning task
++ * @param dflpl the smepahore control structure
++ * @param queue_context the queue_context of the semaphore
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Change_Owner_Priority(
++  Thread_Control       *executing,
++  Priority_Control      new_prio,
++  DFLPL_Control        *dflpl,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control  *owner;
++  ISR_lock_Context lock_context;
++  Priority_Node   *priority_node;
++
++  priority_node = &(dflpl->root_node);
++  owner = _DFLPL_Get_owner(dflpl);
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( owner, &lock_context );
++  _Priority_Node_initialize(priority_node, SCHEDULER_PRIORITY_MAP(new_prio));
++  _Scheduler_Change_migration_priority(owner, dflpl->pu, priority_node);
++  _Thread_Wait_release_default_critical( owner, &lock_context );
++  return RTEMS_SUCCESSFUL;
++}
++
++
++/**
++ * @brief Gets the minimum priority of the priority array of the dflpl semaphore
++ *
++ * @param dflpl The DFLPL control for the operation.
++ *
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _DFLPL_Get_Min_Priority(
++  DFLPL_Control *dflpl
++)
++{
++  int		   i;
++  int 		   fs;
++  Priority_Control min_prio;
++
++  min_prio = PRIORITY_DEFAULT_MAXIMUM;
++  fs = dflpl->first_free_slot;
++
++  for ( i = 0; i < fs; i++ ) {
++    if ( dflpl->priority_array[i] < min_prio ) {
++      min_prio = dflpl->priority_array[i];
++     }
++  }
++
++  return min_prio;
++}
++
++/**
++ * @brief Inserts priority into the priority array of the DFLP-L control.
++ *
++ * @param dflp The DFLP-L control, to get the priority array.
++ * @param executing The currently executing thread.
++ *
++ * @retval 0 The operation succeeded.
++ * @retval 1 No free spot available.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Insert(
++  DFLPL_Control  *dflpl,
++  Thread_Control *executing
++)
++{
++  //negative slot number
++  if ( dflpl->first_free_slot < 0 ) {
++    return 1;
++  }
++
++   //slot number over maximum
++  if ( dflpl->first_free_slot > 15 ) {
++    return 1;
++  }
++
++  //slot already in use
++  if ( dflpl->priority_array[dflpl->first_free_slot] != 0 ) {
++    return 1;
++  }
++
++  //adding the priority of the waiting thread
++  dflpl->priority_array[dflpl->first_free_slot] = _DFLPL_Get_priority( executing );
++  if ( dflpl->first_free_slot==15 ) {
++  }
++  dflpl->first_free_slot++;
++  return 0;
++}
++
++/**
++ * @brief Removes priority from the priority array
++ *
++ * @param dflpl The DFLP-L control for the operation.
++ *
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_remove(
++  DFLPL_Control *dflpl
++)
++{
++  if ( dflpl->first_free_slot < 0 ) {
++    return 1;
++  }
++
++  if ( dflpl->first_free_slot > 15 ) {
++    return 1;
++  }
++
++  if ( dflpl->priority_array[dflpl->first_free_slot] != 0 ) {
++    return 1;
++  }
++  int i, fs;
++  Priority_Control head; //not in use
++  head = dflpl->priority_array[0]; //not in use
++  fs = dflpl->first_free_slot;
++  for ( i = 0; i < fs; i++ ) {
++      dflpl->priority_array[i] = dflpl->priority_array[i+1];
++  }
++  dflpl->first_free_slot--;
++  fs = dflpl->first_free_slot;
++  dflpl->priority_array[fs] = 0;
++  return 0;
++}
++
++/**
++ * @brief Adds thread to priority array, triggers priority changes to owner thread.
++ *
++ * @param dflpl DFLP-L to get the array form.
++ * @param executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_add(
++  DFLPL_Control        *dflpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Priority_Control min, newmin;
++  min = _DFLPL_Get_Min_Priority( dflpl );
++  _DFLPL_Insert( dflpl, executing );
++
++  newmin = _DFLPL_Get_Min_Priority( dflpl );
++  if ( newmin < min ) {
++    _DFLPL_Change_Owner_Priority( executing, newmin, dflpl, queue_context );
++  }
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Gets the minimum priority of the priority array of the DFLP-L semaphore
++ *
++ * @param dflpl The DFLP-L control for the operation.
++ * @param executing The executing task
++ * @param queue_context struct to secure sempahore access
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ *
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Claim_ownership(
++  DFLPL_Control        *dflpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Per_CPU_Control *cpu_self;
++  ISR_lock_Context lock_context;
++  Priority_Node   *priority_node;
++
++  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _DFLPL_Set_owner( dflpl, executing );
++  priority_node = &(dflpl->root_node);
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _Priority_Node_initialize(priority_node, _DFLPL_Get_priority(executing));
++  _DFLPL_Migrate(executing, dflpl, priority_node);
++
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++  _DFLPL_Release( dflpl, queue_context );
++  _Thread_Dispatch_enable( cpu_self );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a DFLPL control. The sychronization processor is set to CPU#1
++ *	by default.
++ *
++ * @param[out] dflpl The DFLPL control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param ceiling_priority
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the DFLPL control shall be initally
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The DFLPL control is initially locked.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Initialize(
++  DFLPL_Control           *dflpl,
++  const Scheduler_Control *scheduler,
++  Priority_Control         ceiling_priority,
++  Thread_Control          *executing,
++  bool                     initially_locked
++)
++{
++  int i;
++
++  if ( initially_locked ) {
++      return STATUS_INVALID_NUMBER;
++  }
++
++  dflpl->pu = _Per_CPU_Get_by_index(1);
++  _Thread_queue_Object_initialize( &dflpl->Wait_queue );
++
++  dflpl->priority_array = _Workspace_Allocate(
++      sizeof( *dflpl->priority_array ) * 16 );
++
++  for ( i = 0; i < 16; i++ ) {
++    dflpl->priority_array[i] = 0;
++  }
++  dflpl->first_free_slot = 0;
++
++  Priority_Node *priority_node;
++  priority_node = &( dflpl->root_node );
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Waits for the ownership of the DFLP-L control.
++ *
++ * @param[in, out] dflpl The DFLP-L control to get the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the
++ *      currently executing thread exceeds the ceiling priority.
++ * @retval STATUS_DEADLOCK A deadlock occured.
++ * @retval STATUS_TIMEOUT A timeout occured.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Wait_for_ownership(
++  DFLPL_Control        *dflpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Per_CPU_Control *cpu_self;
++  ISR_lock_Context lock_context;
++  Priority_Node   *priority_node;
++  Priority_Control new_high_prio;
++
++  cpu_self = _Thread_Dispatch_disable_critical( &queue_context->Lock_context.Lock_context );
++  _DFLPL_add( dflpl, executing, queue_context );
++
++  _Thread_queue_Context_set_thread_state(
++    queue_context,
++    STATES_WAITING_FOR_MUTEX
++  );
++  _Thread_queue_Context_set_enqueue_do_nothing_extra( queue_context );
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++    _Thread_queue_Deadlock_status
++  );
++  _Thread_queue_Enqueue2(
++    &dflpl->Wait_queue.Queue,
++    DFLPL_TQ_OPERATIONS,
++    executing,
++    queue_context,
++    cpu_self
++  );
++
++  _DFLPL_Acquire_critical( dflpl, queue_context );
++
++  _DFLPL_remove( dflpl );
++  new_high_prio = _DFLPL_Get_Min_Priority( dflpl );
++
++  priority_node = &( dflpl->root_node );
++  _DFLPL_Release( dflpl, queue_context );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Seizes the semaphore. Triggers the subroutines wait for semaphore and claim
++ *
++ * @param dflpl The DFLPL control for the operation.
++ * @param executing The executing task
++ * @param queue_context struct to secure sempahore access
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_UNAVAVILABLE Seizing not possible.
++ *
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Seize(
++  DFLPL_Control        *dflpl,
++  Thread_Control       *executing,
++  bool                  wait,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control  status;
++  Thread_Control *owner;
++
++  _DFLPL_Acquire_critical( dflpl, queue_context );
++
++  owner = _DFLPL_Get_owner( dflpl );
++
++  if ( owner == NULL ) {
++    status = _DFLPL_Claim_ownership( dflpl, executing, queue_context );
++  } else if ( owner == executing ) {
++    _DFLPL_Release( dflpl, queue_context );
++    status = STATUS_UNAVAILABLE;
++  } else if ( wait ) {
++    status = _DFLPL_Wait_for_ownership( dflpl, executing, queue_context );
++  } else {
++    _DFLPL_Release( dflpl, queue_context );
++    status = STATUS_UNAVAILABLE;
++  }
++
++  return status;
++}
++
++/**
++ * @brief Surrenders the DFLP-L control.
++ *
++ * @param[in, out] dflpl The DFLP-L control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the DFLP-L control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Surrender(
++  DFLPL_Control        *dflpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_queue_Heads *heads;
++  ISR_lock_Context    lock_context;
++  Priority_Node      *priority_node;
++  Per_CPU_Control    *cpu_self;
++
++  cpu_self = _Thread_Dispatch_disable_critical( &queue_context->Lock_context.Lock_context );
++  priority_node =    &( dflpl->root_node );
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++
++  if ( _DFLPL_Get_owner( dflpl ) != executing ) {
++    _ISR_lock_ISR_enable( &queue_context->Lock_context.Lock_context );
++    return STATUS_NOT_OWNER;
++  }
++
++  _DFLPL_Acquire_critical( dflpl, queue_context );
++  _DFLPL_Set_owner( dflpl, NULL );
++  heads = dflpl->Wait_queue.Queue.heads;
++
++  if ( heads == NULL ) {
++    _DFLPL_Release( dflpl, queue_context );
++    _Thread_queue_Context_clear_priority_updates( queue_context );
++    _Thread_Wait_acquire_default_critical( executing, &lock_context );
++    _DFLPL_Migrate_Back( executing, dflpl );
++    _Thread_Wait_release_default_critical( executing, &lock_context );
++    _Thread_Dispatch_enable( cpu_self );
++    return RTEMS_SUCCESSFUL;
++  }
++
++  _Priority_Node_initialize(
++    priority_node,
++    SCHEDULER_PRIORITY_MAP( _DFLPL_Get_Min_Priority( dflpl ) )
++  );
++
++  _Thread_queue_Surrender_and_Migrate(
++    &dflpl->Wait_queue.Queue,
++    heads,
++    executing,
++    queue_context,
++    DFLPL_TQ_OPERATIONS,
++    dflpl->pu,
++    priority_node
++  );
++
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _DFLPL_Migrate_Back( executing, dflpl );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++  _Thread_Dispatch_enable( cpu_self );
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the DFLP-L control can be destroyed.
++ *
++ * @param dflpl The DFLP-L control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The DFLP-L is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The DFLP-L control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DFLPL_Can_destroy(
++  DFLPL_Control *dflpl
++)
++{
++  if ( _DFLPL_Get_owner( dflpl ) != NULL ) {
++    return STATUS_RESOURCE_IN_USE;
++  }
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Destroys the DFLP-L control
++ *
++ * @param[in, out] The dflpl that is about to be destroyed.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _DFLPL_Destroy(
++  DFLPL_Control        *dflpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _DFLPL_Release( dflpl, queue_context );
++  _Thread_queue_Destroy( &dflpl->Wait_queue );
++}
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_DFLPLIMPL_H */
+diff --git a/cpukit/include/rtems/score/dpcp.h b/cpukit/include/rtems/score/dpcp.h
+new file mode 100644
+index 0000000000..dc7161240d
+--- /dev/null
++++ b/cpukit/include/rtems/score/dpcp.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2018 Jan Pham.  All rights reserved.
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_DPCP
++#define _RTEMS_SCORE_DPCP
++
++#include <rtems/score/cpuopts.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++#include <rtems/score/percpu.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @brief DPCP control block.
++ */
++typedef struct {
++  /**
++   * @brief The thread queue to manage ownership and waiting threads.
++   */
++  Thread_queue_Control Wait_queue;
++
++  /**
++  * @brief User-defined sychronization cpu, where the thread migrates to
++  */
++  Per_CPU_Control *cpu;
++
++
++  /**
++   * @brief The ceiling priority used by the owner thread.
++   */
++  Priority_Node Ceiling_priority;
++
++
++} DPCP_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_DPCP */
+diff --git a/cpukit/include/rtems/score/dpcpimpl.h b/cpukit/include/rtems/score/dpcpimpl.h
+new file mode 100644
+index 0000000000..0bf60b3902
+--- /dev/null
++++ b/cpukit/include/rtems/score/dpcpimpl.h
+@@ -0,0 +1,428 @@
++#ifndef _RTEMS_SCORE_DPCPIMPL_H
++#define _RTEMS_SCORE_DPCPIMPL_H
++
++#include <rtems/score/dpcp.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++#include <rtems/score/scheduler.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreDPCP
++ *
++ * @{
++ */
++#define DPCP_TQ_OPERATIONS &_Thread_queue_Operations_priority
++
++/**
++ * @brief Migrates Thread to an synchronization processor.
++ *
++ * @param executing The executing Thread.
++ * @param dpcp The semaphore control block.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Migrate(
++  Thread_Control *executing,
++  DPCP_Control   *dpcp
++)
++{
++  _Scheduler_Migrate_To( executing, dpcp->cpu, &( dpcp->Ceiling_priority ) );
++}
++
++/**
++ * @brief Migrates the task back to the application processor.
++ *
++ * @param executing The executing Thread.
++ * @param dpcp The semaphore control block.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Migrate_Back(
++  Thread_Control *executing,
++  DPCP_Control   *dpcp
++)
++{
++  _Scheduler_Migrate_Back( executing,dpcp->cpu );
++}
++
++/**
++ * @brief Acquires critical according to DPCP.
++ *
++ * @param dpcp The DPCP control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Acquire_critical(
++  DPCP_Control         *dpcp,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Acquire_critical( &dpcp->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Releases according to DPCP.
++ *
++ * @param dpcp The DPCP control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Release(
++  DPCP_Control         *dpcp,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Release( &dpcp->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets owner of the DPCP control.
++ *
++ * @param dpcp The DPCP control to get the owner from.
++ *
++ * @return The owner of the dpcp control.
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_DPCP_Get_owner(
++  const DPCP_Control *dpcp
++)
++{
++  return dpcp->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets owner of the DPCP control.
++ *
++ * @param[out] dpcp The DPCP control to set the owner of.
++ * @param owner The desired new owner for @a dpcp.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Set_owner(
++  DPCP_Control   *dpcp,
++  Thread_Control *owner
++)
++{
++  dpcp->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Gets ceiling priority of the DPCP control.
++ *
++ * @param dpcp The dpcp to get the priority from.
++ *
++ * @return The priority of the DPCP control.
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _DPCP_Get_priority(
++  const DPCP_Control *dpcp
++)
++{
++  return dpcp->Ceiling_priority.priority;
++}
++
++
++/**
++ * @brief Sets the ceiling priority of the DPCP control
++ *
++ * @param[out] dpcp The DPCP control to set the priority of.
++ * @param priority_ceiling The new priority for the DPCP Control
++ * @param queue_context The Thread queue context
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Set_priority(
++  DPCP_Control         *dpcp,
++  Priority_Control      priority_ceiling,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control *owner;
++  owner = _DPCP_Get_owner( dpcp );
++  if ( owner != NULL ) {
++   //Do nothing, thread executing right now
++  } else {
++    dpcp->Ceiling_priority.priority = priority_ceiling;
++  }
++}
++
++/**
++ * @brief Gets the synchronization CPU of the DPCP Control, where the task migrates to.
++ *
++ * @retval The Per_CPU_Control control block
++ */
++RTEMS_INLINE_ROUTINE Per_CPU_Control *_DPCP_Get_CPU(
++  DPCP_Control *dpcp
++)
++{
++  return dpcp->cpu;
++}
++
++/**
++ * @brief Sets the synchronization CPU of the DPCP Control.
++ *
++ * @param dpcp The semaphore control block
++ * @param cpu The synchronization processor it changes to.
++ * @param queue_context struct to secure sempahore access
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Set_CPU(
++  DPCP_Control         *dpcp,
++  Per_CPU_Control      *cpu,
++  Thread_queue_Context *queue_context
++)
++{
++  _DPCP_Acquire_critical( dpcp, queue_context );
++  dpcp->cpu = cpu;
++  _DPCP_Release( dpcp, queue_context );
++}
++
++/**
++ * @brief Claims ownership of the DPCP control.
++ *
++ * @param dpcp The DPCP control to claim the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Claim_ownership(
++  DPCP_Control         *dpcp,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  ISR_lock_Context  lock_context;
++  Scheduler_Node   *scheduler_node;
++  Per_CPU_Control  *cpu_self;
++
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  scheduler_node = _Thread_Scheduler_get_home_node( executing );
++
++  if ( _Priority_Get_priority( &scheduler_node->Wait.Priority ) <
++      dpcp->Ceiling_priority.priority ) {
++      _Thread_Wait_release_default_critical( executing, &lock_context );
++      _DPCP_Release( dpcp, queue_context );
++      return STATUS_MUTEX_CEILING_VIOLATED;
++  }
++
++  _DPCP_Set_owner( dpcp, executing );
++  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _DPCP_Release( dpcp, queue_context );
++  _DPCP_Migrate( executing, dpcp );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++  _Thread_Dispatch_enable( cpu_self );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a DPCP control.
++ *
++ * @param[out] dpcp The DPCP control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param ceiling_priority
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the DPCP control shall be initally
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The DPCP control is initially locked.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Initialize(
++  DPCP_Control            *dpcp,
++  const Scheduler_Control *scheduler,
++  Priority_Control         ceiling_priority,
++  Thread_Control          *executing,
++  bool                     initially_locked
++)
++{
++  if ( initially_locked ) {
++    return STATUS_INVALID_NUMBER;
++  }
++
++  dpcp->cpu = _Per_CPU_Get_by_index( 1 );
++  _Priority_Node_initialize( &dpcp->Ceiling_priority, ceiling_priority );
++  _Thread_queue_Object_initialize( &dpcp->Wait_queue );
++  return STATUS_SUCCESSFUL;
++}
++/**
++ * @brief Waits for the ownership of the DPCP control.
++ *
++ * @param dpcp The DPCP control to get the ownership of.
++ * @param executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_DEADLOCK A deadlock occured.
++ * @retval STATUS_TIMEOUT A timeout occured.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Wait_for_ownership(
++  DPCP_Control         *dpcp,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Context_set_thread_state(
++    queue_context,
++    STATES_WAITING_FOR_MUTEX
++  );
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++    _Thread_queue_Deadlock_status
++  );
++  _Thread_queue_Enqueue(
++    &dpcp->Wait_queue.Queue,
++    DPCP_TQ_OPERATIONS,
++    executing,
++    queue_context
++  );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Seizes the DPCP control.
++ *
++ * @param[in, out] dpcp The DPCP control to seize the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param wait Indicates whether the calling thread is willing to wait.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ * @retval STATUS_UNAVAILABLE The executing thread is already the owner of
++ *      the DPCP control.  Seizing it is not possible.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Seize(
++  DPCP_Control         *dpcp,
++  Thread_Control       *executing,
++  bool                  wait,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control  status;
++  Thread_Control *owner;
++
++  _DPCP_Acquire_critical( dpcp, queue_context );
++
++  owner = _DPCP_Get_owner( dpcp );
++
++  if ( owner == NULL ) {
++    status = _DPCP_Claim_ownership( dpcp, executing, queue_context );
++  } else if ( owner == executing ) {
++    _DPCP_Release( dpcp, queue_context );
++    status = STATUS_UNAVAILABLE;
++  } else if ( wait ) {
++    status = _DPCP_Wait_for_ownership( dpcp, executing, queue_context );
++  } else {
++    _DPCP_Release( dpcp, queue_context );
++    status = STATUS_UNAVAILABLE;
++  }
++
++  return status;
++}
++
++/**
++ * @brief Surrenders the DPCP control.
++ *
++ * @param[in, out] dpcp The DPCP control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the DPCP control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Surrender(
++  DPCP_Control         *dpcp,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  ISR_lock_Context  lock_context;
++  Per_CPU_Control  *cpu_self;
++  Thread_Control   *new_owner;
++
++  _DPCP_Acquire_critical( dpcp, queue_context );
++  cpu_self = _Thread_Dispatch_disable_critical( &queue_context->Lock_context.Lock_context );
++  if (_DPCP_Get_owner( dpcp ) != executing) {
++    _DPCP_Release( dpcp , queue_context );
++    _Thread_Dispatch_enable( cpu_self );
++    return STATUS_NOT_OWNER;
++  }
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  new_owner = _Thread_queue_First_locked(
++                &dpcp->Wait_queue,
++	        DPCP_TQ_OPERATIONS
++	      );
++  _DPCP_Set_owner( dpcp, new_owner );
++
++  if ( new_owner != NULL ) {
++  #if defined(RTEMS_MULTIPROCESSING)
++    if ( _Objects_Is_local_id( new_owner->Object.id ) )
++  #endif
++    {
++    }
++    _Thread_queue_Extract_critical(
++      &dpcp->Wait_queue.Queue,
++      CORE_MUTEX_TQ_OPERATIONS,
++      new_owner,
++      queue_context
++    );
++    _Thread_Wait_acquire_default_critical( new_owner, &lock_context );
++    _DPCP_Migrate(new_owner, dpcp);
++    _Thread_Wait_release_default_critical( new_owner, &lock_context );
++  } else {
++    _DPCP_Release( dpcp, queue_context );
++  }
++
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _DPCP_Migrate_Back( executing, dpcp );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++  _Thread_Dispatch_enable( cpu_self );
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the DPCP control can be destroyed.
++ *
++ * @param dpcp The DPCP control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The DPCP is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The DPCP control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _DPCP_Can_destroy(
++  DPCP_Control *dpcp
++)
++{
++  if ( _DPCP_Get_owner( dpcp ) != NULL ) {
++    return STATUS_RESOURCE_IN_USE;
++  }
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Destroys the DPCP control
++ *
++ * @param[in, out] The dpcp that is about to be destroyed.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _DPCP_Destroy(
++  DPCP_Control         *dpcp,
++  Thread_queue_Context *queue_context
++)
++{
++  _DPCP_Release( dpcp, queue_context );
++  _Thread_queue_Destroy( &dpcp->Wait_queue );
++}
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_DPCPIMPL_H */
+diff --git a/cpukit/include/rtems/score/fmlpl.h b/cpukit/include/rtems/score/fmlpl.h
+new file mode 100644
+index 0000000000..bedb0c4ecb
+--- /dev/null
++++ b/cpukit/include/rtems/score/fmlpl.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
++ *
++ *  embedded brains GmbH
++ *  Dornierstr. 4
++ *  82178 Puchheim
++ *  Germany
++ *  <rtems@embedded-brains.de>
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_FMLPL_H
++#define _RTEMS_SCORE_FMLPL_H
++
++#include <rtems/score/cpuopts.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @defgroup ScoreFMLPL Multiprocessor Resource Sharing Protocol Handler (This guy didn't even edit this LOL)
++ *
++ * @ingroup Score
++ *
++ *
++ * @{
++ */
++
++typedef struct {
++
++  // our thread queue
++  Thread_queue_Control Wait_queue;
++
++  // the priority node, which is assigned to the priority owner
++  Priority_Node root_node;
++
++  // our array for keeping the priorities of all tasks
++  Priority_Control *priority_array;
++
++  // current first free position
++  int first_free_slot;
++
++} FMLPL_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_FMLPL_H */
+diff --git a/cpukit/include/rtems/score/fmlplimpl.h b/cpukit/include/rtems/score/fmlplimpl.h
+new file mode 100644
+index 0000000000..9302eaaf4f
+--- /dev/null
++++ b/cpukit/include/rtems/score/fmlplimpl.h
+@@ -0,0 +1,581 @@
++/*
++ * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
++ *
++ *  embedded brains GmbH
++ *  Dornierstr. 4
++ *  82178 Puchheim
++ *  Germany
++ *  <rtems@embedded-brains.de>
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_FMLPLIMPL_H
++#define _RTEMS_SCORE_FMLPLIMPL_H
++
++#include <rtems/score/fmlpl.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/rtems/tasksimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++#include <rtems/score/rbtree.h>
++#include <rtems/bspIo.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreFMLPL
++ *
++ * @{
++ */
++#define FMLPL_TQ_OPERATIONS &_Thread_queue_Operations_FIFO
++
++/**
++ * @brief Acquires critical according to FMLP-L.
++ *
++ * @param fmlpl The FMLP-L control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPL_Acquire_critical(
++  FMLPL_Control        *fmlpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Acquire_critical( &fmlpl->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Releases according to FMLP-L.
++ *
++ * @param fmlpl The FMLP-L control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPL_Release(
++  FMLPL_Control        *fmlpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Release( &fmlpl->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets owner of the FMLP-L control.
++ *
++ * @param fmlpl The FMLP-L control to get the owner from.
++ *
++ * @return The owner of the FMLP-L control.
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_FMLPL_Get_owner(
++  const FMLPL_Control *fmlpl
++)
++{
++  return fmlpl->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets owner of the FMLP-L control.
++ *
++ * @param[out] fmlpl The FMLP-L control to set the owner of.
++ * @param owner The desired new owner for @a fmlpl.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPL_Set_owner(
++  FMLPL_Control  *fmlpl,
++  Thread_Control *owner
++)
++{
++  fmlpl->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Gets priority of the FMLP-L control.
++ *
++ * @param fmlpl The fmlpl control to get the priority from.
++ * @param scheduler The corresponding scheduler.
++ *
++ * @return The priority of the FMLP-L control.
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _FMLPL_Get_priority(
++  const Thread_Control *the_thread
++)
++{
++  const Scheduler_Node    *scheduler_node;
++  const Scheduler_Control *scheduler;
++  Priority_Control         core_priority;
++
++  scheduler = _Thread_Scheduler_get_home( the_thread );
++  scheduler_node = _Thread_Scheduler_get_home_node( the_thread );
++
++  core_priority = _Priority_Get_priority( &scheduler_node->Wait.Priority );
++  return _RTEMS_Priority_From_core( scheduler, core_priority );
++}
++
++/**
++ * @brief Changes the priority of the owner.
++ *
++ * @param new_prio THe new priority of the owner.
++ * @param fmlpl The FMLP-L control for the operation.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Change_Owner_Priority(
++  Priority_Control      new_prio,
++  FMLPL_Control        *fmlpl,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control  *owner;
++  ISR_lock_Context lock_context;
++  Priority_Node   *priority_node;
++
++  priority_node = &( fmlpl->root_node );
++  owner = _FMLPL_Get_owner( fmlpl );
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( owner, &lock_context );
++  _Thread_Priority_remove( owner, priority_node, queue_context );
++  _Priority_Node_initialize( priority_node, SCHEDULER_PRIORITY_MAP( new_prio ) );
++  _Thread_Priority_add( owner, priority_node, queue_context );
++  _Thread_Wait_release_default_critical( owner, &lock_context );
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Gets the minimum priority from priority array of the FMLP-L control block.
++ *
++ * @param fmlpl The FMLP-L control to get the array.
++ *
++ * @retval Minimum priority from the array
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _FMLPL_Get_Min_Priority(
++  FMLPL_Control *fmlpl
++)
++{
++  int		   i;
++  int 		   fs;
++  Priority_Control min_prio;
++
++  min_prio = PRIORITY_DEFAULT_MAXIMUM;
++  fs = fmlpl->first_free_slot;
++    
++  for ( i = 0; i < fs; i++ ) {
++    if ( fmlpl->priority_array[i] < min_prio ) {
++      min_prio = fmlpl->priority_array[i];
++      }
++    }
++      
++  return min_prio;
++}
++
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Print_Queue(
++  FMLPL_Control *fmlpl
++)
++{
++  int i;
++
++  for ( i = 0; i < 16; i++ ) {
++    if ( fmlpl->priority_array[i] == 0 ) {
++    } else {
++
++    }
++  }
++
++  for( i = 0; i < fmlpl->first_free_slot; i++ ) {
++  }
++
++  for( i = 0; i < fmlpl->first_free_slot; i++ ) {
++  }
++
++  for( i = 0; i < fmlpl->first_free_slot; i++ ) {
++  }
++}
++
++/**
++ * @brief Inserts priority into the priority array of the FMLP-L control.
++ *
++ * @param fmlpl The FMLP-L control, to get the priority array.
++ * @param executing The currently executing thread.
++ *
++ * @retval 0 The operation succeeded.
++ * @retval 1 No free spot available.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Insert(
++  FMLPL_Control  *fmlpl,
++  Thread_Control *executing
++)
++{
++  if( fmlpl->first_free_slot < 0 ) {
++    return 1;
++  }
++
++  if( fmlpl->first_free_slot > 15 ) {
++    return 1;
++  }
++
++  if( fmlpl->priority_array[fmlpl->first_free_slot] != 0 ) {
++    return 1;
++  }
++  fmlpl->priority_array[fmlpl->first_free_slot] = _FMLPL_Get_priority( executing );
++  if(fmlpl->first_free_slot==15) {
++  }
++
++  fmlpl->first_free_slot++;
++  return 0;
++}
++
++/**
++ * @brief Removes priority from the priority array in the FMLP-L control.
++ *
++ * @param fmlpl The FMLP-L control to get the array.
++ *
++ * @retval 0 The operation succeeded.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_remove(
++  FMLPL_Control *fmlpl
++)
++{
++  int              i;
++  int              fs;
++  Priority_Control head;
++
++  if( fmlpl->first_free_slot < 0 ) {
++    return 1;
++  }
++
++  if( fmlpl->first_free_slot > 15 ) {
++    return 1;
++  }
++
++  if( fmlpl->priority_array[fmlpl->first_free_slot] != 0 ) {
++    return 1;
++  }
++
++  head = fmlpl->priority_array[0];
++  fs = fmlpl->first_free_slot;
++  for( i = 0; i < fs; i++ ) {
++    fmlpl->priority_array[i] = fmlpl->priority_array[i+1];
++  }
++
++  fmlpl->first_free_slot--;
++  fs = fmlpl->first_free_slot;
++  fmlpl->priority_array[fs] = 0;
++  return 0;
++}
++
++/**
++ * @brief Adds thread to priority array, triggers priority changes to owner thread.
++ *
++ * @param fmlpl FMLP-L to get the array form.
++ * @param executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_add(
++  FMLPL_Control        *fmlpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Priority_Control min;
++  Priority_Control newmin;
++
++  min = _FMLPL_Get_Min_Priority( fmlpl );
++  _FMLPL_Insert( fmlpl, executing );
++
++  newmin = _FMLPL_Get_Min_Priority( fmlpl );
++  if ( newmin < min ) {
++    _FMLPL_Change_Owner_Priority( newmin, fmlpl, queue_context );
++  }
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Claims ownership of the FMLP-L control.
++ *
++ * @param fmlpl The FMLP-L control to claim the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Claim_ownership(
++  FMLPL_Control        *fmlpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++
++  ISR_lock_Context  lock_context;
++  Priority_Node    *priority_node;
++
++  _FMLPL_Set_owner( fmlpl, executing );
++  priority_node = &( fmlpl->root_node );
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _Priority_Node_initialize(
++    priority_node,
++    SCHEDULER_PRIORITY_MAP( _FMLPL_Get_Min_Priority( fmlpl ))
++  );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++
++  _FMLPL_Release( fmlpl, queue_context );
++
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a FMLP-L control.
++ *
++ * @param[out] fmlpl The FMLP-L control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param ceiling_priority
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the FMLP-L control shall be initially
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The FMLP-L control is initially locked.
++ * @retval STATUS_NO_MEMORY There is not enough memory to allocate.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Initialize(
++  FMLPL_Control           *fmlpl,
++  const Scheduler_Control *scheduler,
++  Priority_Control         ceiling_priority,
++  Thread_Control          *executing,
++  bool                     initially_locked
++)
++{
++  Priority_Node *priority_node;
++  int            i;
++
++  if ( initially_locked ) {
++    return STATUS_INVALID_NUMBER;
++  }
++  _Thread_queue_Object_initialize( &fmlpl->Wait_queue );
++
++  fmlpl->priority_array = _Workspace_Allocate(
++      sizeof( *fmlpl->priority_array ) * 16
++  );
++
++  for ( i = 0; i < 16; i++ ) {
++    fmlpl->priority_array[i] = 0;
++  }
++  fmlpl->first_free_slot = 0;
++  priority_node = &( fmlpl->root_node );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Waits for the ownership of the FMLP-L control.
++ *
++ * @param[in, out] fmlpl The FMLP-L control to get the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the
++ *      currently executing thread exceeds the ceiling priority.
++ * @retval STATUS_DEADLOCK A deadlock occured.
++ * @retval STATUS_TIMEOUT A timeout occured.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Wait_for_ownership(
++  FMLPL_Control        *fmlpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  _FMLPL_add(fmlpl, executing, queue_context);
++
++  _Thread_queue_Context_set_thread_state(
++    queue_context,
++    STATES_WAITING_FOR_MUTEX
++  );
++  _Thread_queue_Context_set_enqueue_do_nothing_extra( queue_context );
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++    _Thread_queue_Deadlock_status
++  );
++  _Thread_queue_Enqueue(
++    &fmlpl->Wait_queue.Queue,
++    FMLPL_TQ_OPERATIONS,
++    executing,
++    queue_context
++  );
++  _FMLPL_Acquire_critical( fmlpl, queue_context );
++  Priority_Control new_high_prio;
++  _FMLPL_remove( fmlpl );
++  new_high_prio = _FMLPL_Get_Min_Priority( fmlpl );
++  ISR_lock_Context         lock_context;
++  Priority_Node            *priority_node;
++
++  priority_node = &( fmlpl->root_node );
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _Priority_Node_initialize(
++    priority_node,
++    SCHEDULER_PRIORITY_MAP( new_high_prio )
++  );
++  _Thread_Priority_add( executing, priority_node, queue_context );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++  _FMLPL_Release( fmlpl, queue_context );
++
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Seizes the FMLP-L control.
++ *
++ * @param[in, out] fmlpl The FMLP-L control to seize the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param wait Indicates whether the calling thread is willing to wait.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ * @retval STATUS_UNAVAILABLE The executing thread is already the owner of
++ *      the FMLP-L control.  Seizing it is not possible.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Seize(
++  FMLPL_Control        *fmlpl,
++  Thread_Control       *executing,
++  bool                  wait,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control  status;
++  Thread_Control *owner;
++
++  _FMLPL_Acquire_critical( fmlpl, queue_context );
++
++  owner = _FMLPL_Get_owner( fmlpl );
++
++  if ( owner == NULL ) {
++    status = _FMLPL_Claim_ownership( fmlpl, executing, queue_context );
++  } else if ( owner == executing ) {
++    _FMLPL_Release( fmlpl, queue_context );
++    status = STATUS_UNAVAILABLE;
++  } else if ( wait ) {
++    status = _FMLPL_Wait_for_ownership( fmlpl, executing, queue_context );
++  } else {
++    _FMLPL_Release( fmlpl, queue_context );
++    status = STATUS_UNAVAILABLE;
++  }
++
++  return status;
++}
++
++/**
++ * @brief Surrenders the FMLP-L control.
++ *
++ * @param[in, out] fmlpl The FMLP-L control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the FMLP-L control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Surrender(
++  FMLPL_Control        *fmlpl,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_queue_Heads *heads;
++  ISR_lock_Context    lock_context;
++  Priority_Node      *priority_node;
++  Per_CPU_Control    *cpu_self;
++
++  priority_node = &(fmlpl->root_node);
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( executing, &lock_context );
++  _Thread_Priority_remove( executing, priority_node, queue_context );
++  _Thread_Wait_release_default_critical( executing, &lock_context );
++
++  if ( _FMLPL_Get_owner( fmlpl ) != executing ) {
++    _ISR_lock_ISR_enable( &queue_context->Lock_context.Lock_context );
++    return STATUS_NOT_OWNER;
++  }
++
++  _FMLPL_Acquire_critical( fmlpl, queue_context );
++  _FMLPL_Set_owner( fmlpl, NULL );
++  heads = fmlpl->Wait_queue.Queue.heads;
++
++  if ( heads == NULL ) {
++    cpu_self = _Thread_Dispatch_disable_critical(
++      &queue_context->Lock_context.Lock_context
++    );
++    _FMLPL_Release( fmlpl, queue_context );
++    _Thread_queue_Context_clear_priority_updates(queue_context);
++    _Thread_Priority_update(queue_context);
++    _Thread_Dispatch_enable( cpu_self );
++    return RTEMS_SUCCESSFUL;
++  }
++
++  _Thread_queue_Surrender(
++    &fmlpl->Wait_queue.Queue,
++    heads,
++    executing,
++    queue_context,
++    FMLPL_TQ_OPERATIONS
++  );
++
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the FMLP-L control can be destroyed.
++ *
++ * @param fmlpl The FMLP-L control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The FMLP-L is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The FMLP-L control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPL_Can_destroy(
++  FMLPL_Control *fmlpl
++)
++{
++  if ( _FMLPL_Get_owner( fmlpl ) != NULL ) {
++    return STATUS_RESOURCE_IN_USE;
++  }
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Destroys the FMLP-L control
++ *
++ * @param[in, out] The fmlpl that is about to be destroyed.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPL_Destroy(
++  FMLPL_Control        *fmlpl,
++  Thread_queue_Context *queue_context
++)
++{
++  _FMLPL_Release( fmlpl, queue_context );
++  _Thread_queue_Destroy( &fmlpl->Wait_queue );
++}
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_FMLPLIMPL_H */
+diff --git a/cpukit/include/rtems/score/fmlps.h b/cpukit/include/rtems/score/fmlps.h
+new file mode 100644
+index 0000000000..d06ef32b4b
+--- /dev/null
++++ b/cpukit/include/rtems/score/fmlps.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (c) 2018 Malte Muench.  All rights reserved.
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_FMLPS_H
++#define _RTEMS_SCORE_FMLPS_H
++
++#include <rtems/score/cpuopts.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @brief FMLPS control block.
++ */
++typedef struct {
++  /**
++   * @brief The thread queue to manage ownership and waiting threads.
++   */
++  Thread_queue_Control Wait_queue;
++
++  /**
++   * @brief The ceiling priority used by the owner thread.
++   */
++  Priority_Node Ceiling_priority;
++
++  /**
++   * @brief One ceiling priority per scheduler instance.
++   */
++  Priority_Control *ceiling_priorities;
++} FMLPS_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_FMLPS_H */
+diff --git a/cpukit/include/rtems/score/fmlpsimpl.h b/cpukit/include/rtems/score/fmlpsimpl.h
+new file mode 100644
+index 0000000000..d071eee2d9
+--- /dev/null
++++ b/cpukit/include/rtems/score/fmlpsimpl.h
+@@ -0,0 +1,522 @@
++/*
++ * Copyright (c) 2018 Malte Muench.  All rights reserved.
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_FMLPSIMPL_H
++#define _RTEMS_SCORE_FMLPSIMPL_H
++
++
++#include <rtems/score/fmlps.h>
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreFMLPS
++ *
++ * @{
++ */
++
++#define FMLPS_TQ_OPERATIONS &_Thread_queue_Operations_FIFO
++
++/**
++ * @brief Acquires critical according to FMLP-S.
++ *
++ * @param fmlps The FMLP-L control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Acquire_critical(
++  FMLPS_Control        *fmlps,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Acquire_critical( &fmlps->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Releases according to FMLP-S.
++ *
++ * @param fmlps The FMLP-S control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Release(
++  FMLPS_Control        *fmlps,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Release( &fmlps->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets owner of the FMLP-S control.
++ *
++ * @param fmlps The FMLP-S control to get the owner from.
++ *
++ * @return The owner of the FMLP-S control.
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_FMLPS_Get_owner(
++  const FMLPS_Control *fmlps
++)
++{
++  return fmlps->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets owner of the FMLP-S control.
++ *
++ * @param[out] fmlps The FMLP-S control to set the owner of.
++ * @param owner The desired new owner for fmlps
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Set_owner(
++  FMLPS_Control  *fmlps,
++  Thread_Control *owner
++)
++{
++  fmlps->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Gets priority of the FMLP-S control.
++ *
++ * @param fmlps The fmlps to get the priority from.
++ * @param scheduler The corresponding scheduler.
++ *
++ * @return The priority of the FMLP-S control.
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _FMLPS_Get_priority(
++  const FMLPS_Control     *fmlps,
++  const Scheduler_Control *scheduler
++)
++{
++  uint32_t scheduler_index;
++
++  scheduler_index = _Scheduler_Get_index( scheduler );
++  return fmlps->ceiling_priorities[ scheduler_index ];
++}
++
++/**
++ * @brief Sets priority of the FMLP-S control
++ *
++ * @param[out] fmlps The FMLP-S control to set the priority of.
++ * @param scheduler The corresponding scheduler.
++ * @param new_priority The new priority for the FMLP-S control
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Set_priority(
++  FMLPS_Control           *fmlps,
++  const Scheduler_Control *scheduler,
++  Priority_Control         new_priority
++)
++{
++  // do nothing, the priority is always 1
++}
++
++/**
++ * @brief Adds the priority to the given thread.
++ *
++ * @param fmlps The FMLP-S control for the operation.
++ * @param[in, out] thread The thread to add the priority node to.
++ * @param[out] priority_node The priority node to initialize and add to
++ *      the thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the thread
++ *      exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Raise_priority(
++  FMLPS_Control        *fmlps,
++  Thread_Control       *thread,
++  Priority_Node        *priority_node,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control           status;
++  ISR_lock_Context         lock_context;
++  const Scheduler_Control *scheduler;
++  Priority_Control         ceiling_priority;
++  Scheduler_Node          *scheduler_node;
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( thread, &lock_context );
++
++  scheduler = _Thread_Scheduler_get_home( thread );
++  scheduler_node = _Thread_Scheduler_get_home_node( thread );
++  ceiling_priority = _FMLPS_Get_priority( fmlps, scheduler );
++
++  if (
++    ceiling_priority
++      <= _Priority_Get_priority( &scheduler_node->Wait.Priority )
++  ) {
++    _Priority_Node_initialize( priority_node, ceiling_priority );
++    _Thread_Priority_add( thread, priority_node, queue_context );
++    status = STATUS_SUCCESSFUL;
++  } else {
++    status = STATUS_MUTEX_CEILING_VIOLATED;
++  }
++
++  _Thread_Wait_release_default_critical( thread, &lock_context );
++  return status;
++}
++
++/**
++ * @brief Removes the priority from the given thread.
++ *
++ * @param[in, out] The thread to remove the priority from.
++ * @param priority_node The priority node to remove from the thread
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Remove_priority(
++  Thread_Control       *thread,
++  Priority_Node        *priority_node,
++  Thread_queue_Context *queue_context
++)
++{
++  ISR_lock_Context lock_context;
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_acquire_default_critical( thread, &lock_context );
++  _Thread_Priority_remove( thread, priority_node, queue_context );
++  _Thread_Wait_release_default_critical( thread, &lock_context );
++}
++
++/**
++ * @brief Replaces the given priority node with the ceiling priority of
++ *      the FMLP-S control.
++ *
++ * @param fmlps The fmlps control for the operation.
++ * @param[out] thread The thread to replace the priorities.
++ * @param ceiling_priority The node to be replaced.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Replace_priority(
++  FMLPS_Control  *fmlps,
++  Thread_Control *thread,
++  Priority_Node  *ceiling_priority
++)
++{
++  ISR_lock_Context lock_context;
++
++  _Thread_Wait_acquire_default( thread, &lock_context );
++  _Thread_Priority_replace( 
++    thread,
++    ceiling_priority,
++    &fmlps->Ceiling_priority
++  );
++  _Thread_Wait_release_default( thread, &lock_context );
++}
++
++/**
++ * @brief Claims ownership of the FMLP-S control.
++ *
++ * @param fmlps The FMLP-S control to claim the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Claim_ownership(
++  FMLPS_Control        *fmlps,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control   status;
++  Per_CPU_Control *cpu_self;
++
++  status = _FMLPS_Raise_priority(
++    fmlps,
++    executing,
++    &fmlps->Ceiling_priority,
++    queue_context
++  );
++
++  if ( status != STATUS_SUCCESSFUL ) {
++    _FMLPS_Release( fmlps, queue_context );
++    return status;
++  }
++
++  _FMLPS_Set_owner( fmlps, executing );
++  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _FMLPS_Release( fmlps, queue_context );
++  _Thread_Priority_and_sticky_update( executing, 1 );
++  _Thread_Dispatch_enable( cpu_self );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a FMLP-S control.
++ *
++ * @param[out] fmlps The FMLP-S control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param ceiling_priority
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the FMLP-S control shall be initally
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The FMLP-S control is initially locked.
++ * @retval STATUS_NO_MEMORY There is not enough memory to allocate.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Initialize(
++  FMLPS_Control           *fmlps,
++  const Scheduler_Control *scheduler,
++  Priority_Control         ceiling_priority,
++  Thread_Control          *executing,
++  bool                     initially_locked
++)
++{
++  uint32_t scheduler_count = _Scheduler_Count;
++  uint32_t i;
++
++  // this priority should emulate the "non-preemptability" of FMLP-S
++  ceiling_priority = 1;
++
++  if ( initially_locked ) {
++    return STATUS_INVALID_NUMBER;
++  }
++
++  fmlps->ceiling_priorities = _Workspace_Allocate(
++    sizeof( *fmlps->ceiling_priorities ) * scheduler_count
++  );
++  if ( fmlps->ceiling_priorities == NULL ) {
++    return STATUS_NO_MEMORY;
++  }
++
++  for ( i = 0 ; i < scheduler_count ; ++i ) {
++    const Scheduler_Control *scheduler_of_index;
++
++    scheduler_of_index = &_Scheduler_Table[ i ];
++
++    if ( scheduler != scheduler_of_index ) {
++      fmlps->ceiling_priorities[ i ] =
++        _Scheduler_Map_priority( scheduler_of_index, 0 );
++    } else {
++      fmlps->ceiling_priorities[ i ] = ceiling_priority;
++    }
++  }
++
++  _Thread_queue_Object_initialize( &fmlps->Wait_queue );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Waits for the ownership of the FMLP-S control.
++ *
++ * @param[in, out] fmlps The FMLP-S control to get the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the
++ *      currently executing thread exceeds the ceiling priority.
++ * @retval STATUS_DEADLOCK A deadlock occured.
++ * @retval STATUS_TIMEOUT A timeout occured.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Wait_for_ownership(
++  FMLPS_Control        *fmlps,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control status;
++  Priority_Node  ceiling_priority;
++
++  status = _FMLPS_Raise_priority(
++    fmlps,
++    executing,
++    &ceiling_priority,
++    queue_context
++  );
++
++  if ( status != STATUS_SUCCESSFUL ) {
++    _FMLPS_Release( fmlps, queue_context );
++    return status;
++  }
++
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++    _Thread_queue_Deadlock_status
++  );
++  status = _Thread_queue_Enqueue_sticky(
++    &fmlps->Wait_queue.Queue,
++    FMLPS_TQ_OPERATIONS,
++    executing,
++    queue_context
++  );
++
++  if ( status == STATUS_SUCCESSFUL ) {
++    _FMLPS_Replace_priority( fmlps, executing, &ceiling_priority );
++  } else {
++    Thread_queue_Context  queue_context;
++    Per_CPU_Control      *cpu_self;
++    int                   sticky_level_change;
++
++    if ( status != STATUS_DEADLOCK ) {
++      sticky_level_change = -1;
++    } else {
++      sticky_level_change = 0;
++    }
++
++    _ISR_lock_ISR_disable( &queue_context.Lock_context.Lock_context );
++    _FMLPS_Remove_priority( executing, &ceiling_priority, &queue_context );
++    cpu_self = _Thread_Dispatch_disable_critical(
++      &queue_context.Lock_context.Lock_context
++    );
++    _ISR_lock_ISR_enable( &queue_context.Lock_context.Lock_context );
++    _Thread_Priority_and_sticky_update( executing, sticky_level_change );
++    _Thread_Dispatch_enable( cpu_self );
++  }
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Seizes the FMLP-S control.
++ *
++ * @param[in, out] fmlps The FMLP-S control to seize the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param wait Indicates whether the calling thread is willing to wait.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ * @retval STATUS_UNAVAILABLE The executing thread is already the owner of
++ *      the FMLP-S control.  Seizing it is not possible.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Seize(
++  FMLPS_Control        *fmlps,
++  Thread_Control       *executing,
++  bool                  wait,
++  Thread_queue_Context *queue_context
++)
++{
++  Status_Control  status;
++  Thread_Control *owner;
++
++  _FMLPS_Acquire_critical( fmlps, queue_context );
++  owner = _FMLPS_Get_owner( fmlps );
++
++  if ( owner == NULL ) {
++    status = _FMLPS_Claim_ownership( fmlps, executing, queue_context );
++  } else if ( owner == executing ) {
++    _FMLPS_Release( fmlps, queue_context );
++    status = STATUS_UNAVAILABLE;
++  } else if ( wait ) {
++    status = _FMLPS_Wait_for_ownership( fmlps, executing, queue_context );
++  } else {
++    _FMLPS_Release( fmlps, queue_context );
++    status = STATUS_UNAVAILABLE;
++  }
++
++  return status;
++}
++
++/**
++ * @brief Surrenders the FMLP-S control.
++ *
++ * @param[in, out] fmlps The FMLP-S control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the FMLP-S control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Surrender(
++  FMLPS_Control        *fmlps,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_queue_Heads *heads;
++  if ( _FMLPS_Get_owner( fmlps ) != executing ) {
++    _ISR_lock_ISR_enable( &queue_context->Lock_context.Lock_context );
++    return STATUS_NOT_OWNER;
++  }
++
++  _FMLPS_Acquire_critical( fmlps, queue_context );
++
++  _FMLPS_Set_owner( fmlps, NULL );
++  _FMLPS_Remove_priority( executing, &fmlps->Ceiling_priority, queue_context );
++
++  heads = fmlps->Wait_queue.Queue.heads;
++
++  if ( heads == NULL ) {
++    Per_CPU_Control *cpu_self;
++
++    cpu_self = _Thread_Dispatch_disable_critical(
++      &queue_context->Lock_context.Lock_context
++    );
++    _FMLPS_Release( fmlps, queue_context );
++    _Thread_Priority_and_sticky_update( executing, -1 );
++    _Thread_Dispatch_enable( cpu_self );
++    return RTEMS_SUCCESSFUL;
++  }
++
++  _Thread_queue_Surrender_sticky(
++    &fmlps->Wait_queue.Queue,
++    heads,
++    executing,
++    queue_context,
++    FMLPS_TQ_OPERATIONS
++  );
++  return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the FMLP-S control can be destroyed.
++ *
++ * @param fmlps The FMLP-S control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The FMLP-S is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The FMLP-S control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _FMLPS_Can_destroy( FMLPS_Control *fmlps )
++{
++  if ( _FMLPS_Get_owner( fmlps ) != NULL ) {
++    return STATUS_RESOURCE_IN_USE;
++  }
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Destroys the FMLP-S control
++ *
++ * @param[in, out] The fmlps that is about to be destroyed.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _FMLPS_Destroy(
++  FMLPS_Control        *fmlps,
++  Thread_queue_Context *queue_context
++)
++{
++  _FMLPS_Release( fmlps, queue_context );
++  _Thread_queue_Destroy( &fmlps->Wait_queue );
++  _Workspace_Free( fmlps->ceiling_priorities );
++}
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_FMLPSIMPL_H */
+diff --git a/cpukit/include/rtems/score/hdga.h b/cpukit/include/rtems/score/hdga.h
+new file mode 100644
+index 0000000000..e825c51b3b
+--- /dev/null
++++ b/cpukit/include/rtems/score/hdga.h
+@@ -0,0 +1,55 @@
++/*
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_HDGA_H
++#define _RTEMS_SCORE_HDGA_H
++
++#include <rtems/score/cpuopts.h>
++#include <rtems/score/ticket.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @brief HDGA control block.
++ */
++typedef struct {
++  /**
++   * @brief The thread queue to manage ownership and waiting threads.
++   */
++  Thread_queue_Control Wait_queue;
++
++  /**
++   *ticket array, where we store our tickets and the order
++   */
++  Ticket_Control *ticket_order;
++
++  /**
++   * size of ticket_order
++   */
++  int order_size;
++
++  /**
++   * current_position of array
++   */
++  int current_position;
++
++} HDGA_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_HDGA_H */
+diff --git a/cpukit/include/rtems/score/hdgaimpl.h b/cpukit/include/rtems/score/hdgaimpl.h
+new file mode 100644
+index 0000000000..553b40f725
+--- /dev/null
++++ b/cpukit/include/rtems/score/hdgaimpl.h
+@@ -0,0 +1,400 @@
++#ifndef _RTEMS_SCORE_HDGAIMPL_H
++#define _RTEMS_SCORE_HDGAIMPL_H
++
++#include <rtems/score/hdga.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreHDGA
++ *
++ * @{
++ */
++#define HDGA_TQ_OPERATIONS &_Thread_queue_Operations_TICKET
++
++/**
++ * @brief Locks the queue of the semaphore control block
++ *
++ * @param hdga the semaphore control block
++ * @param queue_context queue for locking
++ *
++ */
++RTEMS_INLINE_ROUTINE void _HDGA_Acquire_critical(
++  HDGA_Control         *hdga,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Acquire_critical( &hdga->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets the ticket number of the currently executing task
++ *
++ * @param executing the currently executing task
++ * @return The ticket number of the task
++ *
++ */
++RTEMS_INLINE_ROUTINE Ticket_Control _HDGA_Get_Ticket_number(
++  Thread_Control *executing
++)
++{
++  return executing->ticket.ticket;
++}
++
++/**
++ * @brief Increments the current position in the queue by incrementing the
++ * 	pointer current_position
++ *
++ * @param hdga the semaphore control block
++ *
++ */
++RTEMS_INLINE_ROUTINE void _HDGA_Increment_Current_Position(
++  HDGA_Control *hdga
++)
++{
++  hdga->current_position = ++hdga->current_position;
++  int current_pos = hdga->current_position;
++
++  if ( current_pos == hdga->order_size ) {
++    hdga->current_position = 0;
++  }
++}
++
++/**
++ * @brief Checks if the ticket number of a task is valid by comparing the current ticket
++ * 	number in the queue and the ticket number of the task
++ *
++ * @param hdga the semaphore control block
++ * @param executing The executing task
++ */
++RTEMS_INLINE_ROUTINE bool _HDGA_Has_Valid_ticket(
++  HDGA_Control   *hdga,
++  Thread_Control *executing
++)
++{
++  return executing->ticket.ticket
++    == hdga->ticket_order[hdga->current_position];
++}
++
++/**
++ * @brief Releases the queue of the semaphore control block
++ *
++ * @param hdga the semaphore control block
++ * @param queue_context queue for locking
++ *
++ */
++RTEMS_INLINE_ROUTINE void _HDGA_Release(
++  HDGA_Control         *hdga,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Release( &hdga->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets the owner of the semaphore control block
++ *
++ * @param hdga the semaphore control block
++ *
++ * @return The owner of the semaphore control block
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_HDGA_Get_owner(
++  const HDGA_Control *hdga
++)
++{
++  return hdga->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets the owner of the semaphore control block
++ *
++ * @param hdga the semaphore control block
++ * @param executing The owner of the semaphore control block
++ *
++ */
++RTEMS_INLINE_ROUTINE void _HDGA_Set_owner(
++  HDGA_Control   *hdga,
++  Thread_Control *owner
++)
++{
++  hdga->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Claims ownership of the HDGA semaphore
++ *
++ * @param hdga the semaphore control block
++ * @param executing The owner of the semaphore control block
++ * @param queue_context queue for locking
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Claim_ownership(
++  HDGA_Control         *hdga,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  _HDGA_Set_owner( hdga, executing );
++  _HDGA_Release( hdga, queue_context );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a HDGA control.
++ *
++ * @param[out] hdga The HDGA control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param queue_size the size of our ticket array
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the HDGA control shall be initially
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The HDGA control is initially locked.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Initialize(
++  HDGA_Control            *hdga,
++  const Scheduler_Control *scheduler,
++  Priority_Control         queue_size,
++  Thread_Control          *executing,
++  bool                     initially_locked
++)
++{
++  hdga->order_size = queue_size;
++  hdga->current_position = 0;
++
++  if ( initially_locked ) {
++    return STATUS_INVALID_NUMBER;
++  }
++
++  hdga->ticket_order = _Workspace_Allocate(
++    sizeof( *hdga->ticket_order ) * hdga->order_size
++  );
++
++  if ( hdga->ticket_order == NULL ) {
++    return STATUS_NO_MEMORY;
++  }
++
++  _Thread_queue_Object_initialize( &hdga->Wait_queue );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Waits for the ownership of the HDGA control.
++ *
++ *
++ * @param hdga The HDGA control to get the ownership of.
++ * @param executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_DEADLOCK A deadlock occurred.
++ * @retval STATUS_TIMEOUT A timeout occurred.
++ */
++
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Wait_for_ownership(
++  HDGA_Control         *hdga,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Context_set_thread_state(
++   queue_context,
++   STATES_WAITING_FOR_MUTEX
++  );
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++   _Thread_queue_Deadlock_status
++  );
++  _Thread_queue_Enqueue(
++    &hdga->Wait_queue.Queue,
++    HDGA_TQ_OPERATIONS,
++    executing,
++    queue_context
++  );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Seizes the semaphore. Triggers the subroutines wait for semaphore and claim
++ *
++ * @param dflpl The DFLPL control for the operation.
++ * @param executing The executing task
++ * @param queue_context struct to secure semaphore access
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_UNAVAVILABLE Seizing not possible.
++ *
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Seize(
++  HDGA_Control         *hdga,
++  Thread_Control       *executing,
++  bool                  wait,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control *owner;
++  Status_Control  status;
++
++  _HDGA_Acquire_critical( hdga, queue_context );
++
++  owner = _HDGA_Get_owner( hdga );
++
++  if ( owner == NULL && _HDGA_Has_Valid_ticket(hdga, executing)) {
++    status = _HDGA_Claim_ownership( hdga, executing, queue_context );
++  } else if ( owner == executing ) {
++    _HDGA_Release( hdga, queue_context );
++    status = STATUS_UNAVAILABLE;
++  } else if ( wait ) {
++    status = _HDGA_Wait_for_ownership( hdga, executing, queue_context );
++  } else {
++    _HDGA_Release( hdga, queue_context );
++    status = STATUS_UNAVAILABLE;
++  }
++
++  return status;
++}
++
++/**
++ * @brief Surrenders the HDGA control.
++ *
++ * @param[in, out] hdga The HDGA control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the HDGA control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Surrender(
++  HDGA_Control         *hdga,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control   *new_owner;
++
++  _HDGA_Acquire_critical( hdga, queue_context );
++  //cpu_self = _Thread_Dispatch_disable_critical(&queue_context->Lock_context.Lock_context );
++  if ( _HDGA_Get_owner( hdga ) != executing ) {
++   _HDGA_Release( hdga, queue_context );
++    return STATUS_NOT_OWNER;
++  }
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _HDGA_Increment_Current_Position( hdga );
++
++  new_owner = _Thread_queue_First_locked(
++                &hdga->Wait_queue,
++		HDGA_TQ_OPERATIONS
++	      );
++  _HDGA_Set_owner(hdga, new_owner);
++
++  if ( new_owner != NULL ) {
++  #if defined(RTEMS_MULTIPROCESSING)
++    if ( _Objects_Is_local_id( new_owner->Object.id ) )
++  #endif
++    {
++    }
++    if ( !_HDGA_Has_Valid_ticket( hdga, new_owner ) ) {
++      _HDGA_Set_owner( hdga, NULL );
++      _HDGA_Release( hdga, queue_context );
++      return STATUS_SUCCESSFUL;
++    }
++    _Thread_queue_Extract_critical(
++      &hdga->Wait_queue.Queue,
++      HDGA_TQ_OPERATIONS,
++      new_owner,
++      queue_context
++    );
++  } else {
++    _HDGA_Release( hdga, queue_context );
++  }
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the HDGA control can be destroyed.
++ *
++ * @param dpcp The HDGA control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The HDGA is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The HDGA control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Can_destroy( HDGA_Control *hdga )
++{
++  if ( _HDGA_Get_owner( hdga ) != NULL ||
++    _Thread_queue_First_locked(
++      &hdga->Wait_queue,
++      HDGA_TQ_OPERATIONS
++  ) != NULL)  {
++    return STATUS_RESOURCE_IN_USE;
++  }
++
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Gives the task a ticket number and saves it in our ticket array
++ * in the hdga control block. Originally it was possible to have the same task more than
++ * one time in the queue, hence the weird if else condition.
++ *
++ * @param[in, out] hdga The HDGA control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _HDGA_Set_thread(
++  HDGA_Control         *hdga,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context,
++  int   	        position
++)
++{
++  int posT = 0;
++  _HDGA_Acquire_critical( hdga, queue_context );
++
++  if ( _HDGA_Get_Ticket_number( executing ) == 0 ) {
++    posT = position + 1;
++    executing->ticket.ticket = posT;
++    hdga->ticket_order[position] = executing->ticket.ticket;
++  } else {
++    hdga->ticket_order[position] = executing->ticket.ticket;
++  }
++  _HDGA_Release( hdga, queue_context );
++  return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Deletes the HDGA control.
++ *
++ * @param[in, out] hdga The HDGA control to surrender the control of.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _HDGA_Destroy(
++  HDGA_Control         *hdga,
++  Thread_queue_Context *queue_context
++)
++{
++  _HDGA_Release( hdga, queue_context );
++  _Thread_queue_Destroy( &hdga->Wait_queue );
++  _Workspace_Free( hdga->ticket_order );
++}
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_HDGAIMPL_H */
+diff --git a/cpukit/include/rtems/score/mpcp.h b/cpukit/include/rtems/score/mpcp.h
+new file mode 100644
+index 0000000000..65c1578e09
+--- /dev/null
++++ b/cpukit/include/rtems/score/mpcp.h
+@@ -0,0 +1,51 @@
++#ifndef SOURCE_MPCP_H
++#define SOURCE_MPCP_H
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/threadq.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @defgroup ScoreMPCP Multiprocessor Resource Sharing Protocol Handler
++ *
++ * @ingroup Score
++ *
++ * @brief Multiprocessor Resource Sharing Protocol (MPCP).
++ *
++ *
++ * @{
++ */
++
++/**
++ * @brief MPCP control block.
++ */
++typedef struct {
++  /**
++   * @brief The thread queue to manage ownership and waiting threads.
++   */
++  Thread_queue_Control Wait_queue;
++
++  /**
++   * @brief The ceiling priority used by the owner thread.
++   */
++  Priority_Node Ceiling_priority;
++
++  /**
++   * @brief One ceiling priority per scheduler instance.
++   */
++  Priority_Control *ceiling_priorities;
++} MPCP_Control;
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif //SOURCE_MPCP_H
+diff --git a/cpukit/include/rtems/score/mpcpimpl.h b/cpukit/include/rtems/score/mpcpimpl.h
+new file mode 100644
+index 0000000000..d39661338c
+--- /dev/null
++++ b/cpukit/include/rtems/score/mpcpimpl.h
+@@ -0,0 +1,520 @@
++/*
++ * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
++ *
++ *  embedded brains GmbH
++ *  Dornierstr. 4
++ *  82178 Puchheim
++ *  Germany
++ *  <rtems@embedded-brains.de>
++ *
++ * The license and distribution terms for this file may be
++ * found in the file LICENSE in this distribution or at
++ * http://www.rtems.org/license/LICENSE.
++ */
++
++#ifndef _RTEMS_SCORE_MPCPIMPL_H
++#define _RTEMS_SCORE_MPCPIMPL_H
++
++
++#include <rtems/score/mpcp.h>
++
++#if defined(RTEMS_SMP)
++
++#include <rtems/score/assert.h>
++#include <rtems/score/status.h>
++#include <rtems/score/threadqimpl.h>
++#include <rtems/score/watchdogimpl.h>
++#include <rtems/score/wkspace.h>
++#include <rtems/score/schedulerimpl.h>
++#include <rtems/score/threadimpl.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++/**
++ * @addtogroup ScoreMPCP
++ *
++ * @{
++ */
++
++#define MPCP_TQ_OPERATIONS &_Thread_queue_Operations_priority
++
++/**
++ * @brief Acquires critical according to MPCP.
++ *
++ * @param mpcp The MPCP control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Acquire_critical(
++        MPCP_Control         *mpcp,
++        Thread_queue_Context *queue_context
++)
++{
++    _Thread_queue_Acquire_critical( &mpcp->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Releases according to MPCP.
++ *
++ * @param mpcp The MPCP control for the operation.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Release(
++  MPCP_Control         *mpcp,
++  Thread_queue_Context *queue_context
++)
++{
++    _Thread_queue_Release( &mpcp->Wait_queue, queue_context );
++}
++
++/**
++ * @brief Gets owner of the MPCP control.
++ *
++ * @param mpcp The MPCP control to get the owner from.
++ *
++ * @return The owner of the MPCP control.
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_MPCP_Get_owner(
++        const MPCP_Control *mpcp
++)
++{
++    return mpcp->Wait_queue.Queue.owner;
++}
++
++/**
++ * @brief Sets owner of the MPCP control.
++ *
++ * @param[out] mpcp The MPCP control to set the owner of.
++ * @param owner The desired new owner for @a mpcp.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Set_owner(
++        MPCP_Control   *mpcp,
++        Thread_Control *owner
++)
++{
++    mpcp->Wait_queue.Queue.owner = owner;
++}
++
++/**
++ * @brief Gets priority of the MPCP control.
++ *
++ * @param mpcp The mpcp to get the priority from.
++ * @param scheduler The corresponding scheduler.
++ *
++ * @return The priority of the MPCP control.
++ */
++RTEMS_INLINE_ROUTINE Priority_Control _MPCP_Get_priority(
++        const MPCP_Control      *mpcp,
++        const Scheduler_Control *scheduler
++)
++{
++    uint32_t scheduler_index;
++
++    scheduler_index = _Scheduler_Get_index( scheduler );
++    return mpcp ->ceiling_priorities[scheduler_index];
++}
++
++/**
++ * @brief Sets priority of the MPCP control
++ *
++ * @param[out] mpcp The MPCP control to set the priority of.
++ * @param scheduler The corresponding scheduler.
++ * @param new_priority The new priority for the MPCP control
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Set_priority(
++        MPCP_Control            *mpcp,
++        const Scheduler_Control *scheduler,
++        Priority_Control         new_priority
++)
++{
++    uint32_t scheduler_index;
++
++    scheduler_index = _Scheduler_Get_index( scheduler );
++    mpcp->ceiling_priorities[ scheduler_index ] = new_priority;
++}
++
++/**
++ * @brief Adds the priority to the given thread.
++ *
++ * @param mpcp The MPCP control for the operation.
++ * @param[in, out] thread The thread to add the priority node to.
++ * @param[out] priority_node The priority node to initialize and add to
++ *      the thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the thread
++ *      exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Raise_priority(
++        MPCP_Control         *mpcp,
++        Thread_Control       *thread,
++        Priority_Node        *priority_node,
++        Thread_queue_Context *queue_context
++)
++{
++    Status_Control           status;
++    ISR_lock_Context         lock_context;
++    const Scheduler_Control *scheduler;
++    Priority_Control         ceiling_priority;
++    Scheduler_Node          *scheduler_node;
++
++    _Thread_queue_Context_clear_priority_updates( queue_context );
++    _Thread_Wait_acquire_default_critical( thread, &lock_context );
++
++    scheduler = _Thread_Scheduler_get_home( thread );
++    scheduler_node = _Thread_Scheduler_get_home_node( thread );
++    ceiling_priority = _MPCP_Get_priority( mpcp, scheduler );
++
++    if (
++            ceiling_priority
++            <= _Priority_Get_priority( &scheduler_node->Wait.Priority )
++            ) {
++        _Priority_Node_initialize( priority_node, ceiling_priority );
++        _Thread_Priority_add( thread, priority_node, queue_context );
++        status = STATUS_SUCCESSFUL;
++    } else {
++        status = STATUS_MUTEX_CEILING_VIOLATED;
++    }
++
++    _Thread_Wait_release_default_critical( thread, &lock_context );
++    return status;
++}
++
++/**
++ * @brief Removes the priority from the given thread.
++ *
++ * @param[in, out] The thread to remove the priority from.
++ * @param priority_node The priority node to remove from the thread
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Remove_priority(
++        Thread_Control       *thread,
++        Priority_Node        *priority_node,
++        Thread_queue_Context *queue_context
++)
++{
++    ISR_lock_Context lock_context;
++
++    _Thread_queue_Context_clear_priority_updates( queue_context );
++    _Thread_Wait_acquire_default_critical( thread, &lock_context );
++    _Thread_Priority_remove( thread, priority_node, queue_context );
++    _Thread_Wait_release_default_critical( thread, &lock_context );
++}
++
++/**
++ * @brief Replaces the given priority node with the ceiling priority of
++ *      the MPCP control.
++ *
++ * @param mpcp The mpcp control for the operation.
++ * @param[out] thread The thread to replace the priorities.
++ * @param ceiling_priority The node to be replaced.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Replace_priority(
++        MPCP_Control   *mpcp,
++        Thread_Control *thread,
++        Priority_Node  *ceiling_priority
++)
++{
++    ISR_lock_Context lock_context;
++
++    _Thread_Wait_acquire_default( thread, &lock_context );
++    _Thread_Priority_replace(
++            thread,
++            ceiling_priority,
++            &mpcp->Ceiling_priority
++    );
++    _Thread_Wait_release_default( thread, &lock_context );
++}
++
++/**
++ * @brief Claims ownership of the MPCP control.
++ *
++ * @param mpcp The MPCP control to claim the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Claim_ownership(
++        MPCP_Control         *mpcp,
++        Thread_Control       *executing,
++        Thread_queue_Context *queue_context
++)
++{
++    Status_Control   status;
++    Per_CPU_Control *cpu_self;
++
++    status = _MPCP_Raise_priority(
++            mpcp,
++            executing,
++            &mpcp->Ceiling_priority,
++            queue_context
++    );
++
++    if ( status != STATUS_SUCCESSFUL ) {
++        _MPCP_Release( mpcp, queue_context );
++        return status;
++    }
++
++    _MPCP_Set_owner( mpcp, executing );
++    cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++    _MPCP_Release( mpcp, queue_context );
++    _Thread_Priority_update( queue_context );
++    _Thread_Dispatch_enable( cpu_self );
++
++    return RTEMS_SUCCESSFUL;
++}
++
++/**
++ * @brief Initializes a MPCP control.
++ *
++ * @param[out] mpcp The MPCP control that is initialized.
++ * @param scheduler The scheduler for the operation.
++ * @param ceiling_priority
++ * @param executing The currently executing thread.  Ignored in this method.
++ * @param initially_locked Indicates whether the MPCP control shall be initally
++ *      locked. If it is initially locked, this method returns STATUS_INVALID_NUMBER.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_INVALID_NUMBER The MPCP control is initially locked.
++ * @retval STATUS_NO_MEMORY There is not enough memory to allocate.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Initialize(
++        MPCP_Control            *mpcp,
++        const Scheduler_Control *scheduler,
++        Priority_Control         ceiling_priority,
++        Thread_Control          *executing,
++        bool                     initially_locked
++)
++{
++  (void) executing;
++    uint64_t scheduler_count = _Scheduler_Count;
++    uint32_t i;
++
++    if ( initially_locked ) {
++        return STATUS_INVALID_NUMBER;
++    }
++
++    mpcp->ceiling_priorities = (Priority_Control *)_Workspace_Allocate(
++            sizeof( *mpcp->ceiling_priorities ) * scheduler_count
++    );
++    if ( mpcp->ceiling_priorities == NULL ) {
++        return STATUS_NO_MEMORY;
++    }
++
++    for ( i = 0 ; i < scheduler_count ; ++i ) {
++        const Scheduler_Control *scheduler_of_index;
++
++        scheduler_of_index = &_Scheduler_Table[ i ];
++
++        if ( scheduler != scheduler_of_index ) {
++            mpcp->ceiling_priorities[ i ] =
++                   _Scheduler_Map_priority( scheduler_of_index, 1);
++        } else {
++            mpcp->ceiling_priorities[ i ] = ceiling_priority;
++        }
++    }
++
++    _Thread_queue_Object_initialize( &mpcp->Wait_queue );
++    return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Waits for the ownership of the MPCP control.
++ *
++ * @param[in, out] mpcp The MPCP control to get the ownership of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context the thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the
++ *      currently executing thread exceeds the ceiling priority.
++ * @retval STATUS_DEADLOCK A deadlock occured.
++ * @retval STATUS_TIMEOUT A timeout occured.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Wait_for_ownership(
++  MPCP_Control         *mpcp,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context
++)
++{
++
++  Status_Control status;
++  Priority_Node  ceiling_priority;
++
++  _Thread_queue_Context_set_thread_state(
++    queue_context,
++    STATES_WAITING_FOR_SEMAPHORE
++  );
++
++  _Thread_queue_Context_set_deadlock_callout(
++    queue_context,
++    _Thread_queue_Deadlock_status
++  );
++
++  _Thread_queue_Enqueue(
++    &mpcp->Wait_queue.Queue,
++    MPCP_TQ_OPERATIONS,
++    executing,
++    queue_context
++  );
++
++  status = _MPCP_Raise_priority(
++    mpcp,
++    executing,
++    &ceiling_priority,
++    queue_context
++  );
++
++  if ( status != STATUS_SUCCESSFUL ) {
++    _MPCP_Release( mpcp, queue_context );
++    return status;
++  }
++  _MPCP_Replace_priority( mpcp, executing, &ceiling_priority );
++
++  return status;
++}
++
++/**
++ * @brief Seizes the MPCP control.
++ *
++ * @param[in, out] mpcp The MPCP control to seize the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param wait Indicates whether the calling thread is willing to wait.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_MUTEX_CEILING_VIOLATED The wait priority of the executing
++ *      thread exceeds the ceiling priority.
++ * @retval STATUS_UNAVAILABLE The executing thread is already the owner of
++ *      the MPCP control.  Seizing it is not possible.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Seize(
++        MPCP_Control         *mpcp,
++        Thread_Control       *executing,
++        bool                  wait,
++        Thread_queue_Context *queue_context
++)
++{
++    Status_Control  status;
++    Thread_Control *owner;
++
++    _MPCP_Acquire_critical( mpcp, queue_context );
++
++    owner = _MPCP_Get_owner( mpcp );
++
++    if ( owner == NULL ) {
++        status = _MPCP_Claim_ownership( mpcp, executing, queue_context );
++    } else if ( owner == executing ) {
++        _MPCP_Release( mpcp, queue_context );
++        status = STATUS_UNAVAILABLE;
++    } else if ( wait ) {
++        status = _MPCP_Wait_for_ownership( mpcp, executing, queue_context );
++    } else {
++        _MPCP_Release( mpcp, queue_context );
++        status = STATUS_UNAVAILABLE;
++    }
++
++    return status;
++}
++
++/**
++ * @brief Surrenders the MPCP control.
++ *
++ * @param[in, out] mpcp The MPCP control to surrender the control of.
++ * @param[in, out] executing The currently executing thread.
++ * @param queue_context The thread queue context.
++ *
++ * @retval STATUS_SUCCESSFUL The operation succeeded.
++ * @retval STATUS_NOT_OWNER The executing thread does not own the MPCP control.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Surrender(
++        MPCP_Control         *mpcp,
++        Thread_Control       *executing,
++        Thread_queue_Context *queue_context
++)
++{
++    Thread_queue_Heads *heads;
++
++    if ( _MPCP_Get_owner( mpcp ) != executing ) {
++        _ISR_lock_ISR_enable( &queue_context->Lock_context.Lock_context );
++        return STATUS_NOT_OWNER;
++    }
++
++    _MPCP_Acquire_critical( mpcp, queue_context );
++
++    _MPCP_Set_owner( mpcp, NULL );
++    _MPCP_Remove_priority( executing, &mpcp->Ceiling_priority, queue_context );
++
++    heads = mpcp->Wait_queue.Queue.heads;
++
++    if ( heads == NULL ) {
++        Per_CPU_Control *cpu_self;
++
++        cpu_self = _Thread_Dispatch_disable_critical(
++                     &queue_context->Lock_context.Lock_context
++        );
++        _MPCP_Release( mpcp, queue_context );
++        _Thread_Priority_update( queue_context );
++        _Thread_Dispatch_enable( cpu_self );
++        return STATUS_SUCCESSFUL;
++    }
++
++    _Thread_queue_Surrender(
++            &mpcp->Wait_queue.Queue,
++            heads,
++            executing,
++            queue_context,
++            MPCP_TQ_OPERATIONS
++    );
++    return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Checks if the MPCP control can be destroyed.
++ *
++ * @param mpcp The MPCP control for the operation.
++ *
++ * @retval STATUS_SUCCESSFUL The MPCP is currently not used
++ *      and can be destroyed.
++ * @retval STATUS_RESOURCE_IN_USE The MPCP control is in use,
++ *      it cannot be destroyed.
++ */
++RTEMS_INLINE_ROUTINE Status_Control _MPCP_Can_destroy( MPCP_Control *mpcp )
++{
++    if ( _MPCP_Get_owner( mpcp ) != NULL ) {
++        return STATUS_RESOURCE_IN_USE;
++    }
++
++    return STATUS_SUCCESSFUL;
++}
++
++/**
++ * @brief Destroys the MPCP control
++ *
++ * @param[in, out] The mpcp that is about to be destroyed.
++ * @param queue_context The thread queue context.
++ */
++RTEMS_INLINE_ROUTINE void _MPCP_Destroy(
++        MPCP_Control         *mpcp,
++        Thread_queue_Context *queue_context
++)
++{
++    _MPCP_Release( mpcp, queue_context );
++    _Thread_queue_Destroy( &mpcp->Wait_queue );
++    _Workspace_Free( mpcp->ceiling_priorities );
++}
++
++/** @} */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif /* RTEMS_SMP */
++
++#endif /* _RTEMS_SCORE_MPCPIMPL_H */
+diff --git a/cpukit/include/rtems/score/mrspimpl.h b/cpukit/include/rtems/score/mrspimpl.h
+index 45b1d1ce7d..c7ea50c24f 100644
+--- a/cpukit/include/rtems/score/mrspimpl.h
++++ b/cpukit/include/rtems/score/mrspimpl.h
+@@ -46,7 +46,7 @@ extern "C" {
+ #define MRSP_TQ_OPERATIONS &_Thread_queue_Operations_priority_inherit
+ 
+ /**
+- * @brief Acquires critical accordingt to MrsP.
++ * @brief Acquires critical according to MrsP.
+  *
+  * @param mrsp The MrsP control for the operation.
+  * @param queue_context The thread queue context.
+@@ -124,7 +124,7 @@ RTEMS_INLINE_ROUTINE Priority_Control _MRSP_Get_priority(
+  * @brief Sets priority of the MrsP control
+  *
+  * @param[out] mrsp The MrsP control to set the priority of.
+- * @param schedulger The corresponding scheduler.
++ * @param scheduler The corresponding scheduler.
+  * @param new_priority The new priority for the MrsP control
+  */
+ RTEMS_INLINE_ROUTINE void _MRSP_Set_priority(
+@@ -270,7 +270,8 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Claim_ownership(
+   _MRSP_Release( mrsp, queue_context );
+   _Thread_Priority_and_sticky_update( executing, 1 );
+   _Thread_Dispatch_enable( cpu_self );
+-  return STATUS_SUCCESSFUL;
++
++  return RTEMS_SUCCESSFUL;
+ }
+ 
+ /**
+@@ -370,7 +371,6 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Wait_for_ownership(
+     executing,
+     queue_context
+   );
+-
+   if ( status == STATUS_SUCCESSFUL ) {
+     _MRSP_Replace_priority( mrsp, executing, &ceiling_priority );
+   } else {
+@@ -393,8 +393,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Wait_for_ownership(
+     _Thread_Priority_and_sticky_update( executing, sticky_level_change );
+     _Thread_Dispatch_enable( cpu_self );
+   }
+-
+-  return status;
++  return RTEMS_SUCCESSFUL;
+ }
+ 
+ /**
+@@ -460,7 +459,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Surrender(
+ 
+   if ( _MRSP_Get_owner( mrsp ) != executing ) {
+     _ISR_lock_ISR_enable( &queue_context->Lock_context.Lock_context );
+-    return STATUS_NOT_OWNER;
++   return STATUS_NOT_OWNER;
+   }
+ 
+   _MRSP_Acquire_critical( mrsp, queue_context );
+@@ -479,6 +478,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Surrender(
+     _MRSP_Release( mrsp, queue_context );
+     _Thread_Priority_and_sticky_update( executing, -1 );
+     _Thread_Dispatch_enable( cpu_self );
++
+     return STATUS_SUCCESSFUL;
+   }
+ 
+@@ -490,6 +490,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MRSP_Surrender(
+     MRSP_TQ_OPERATIONS
+   );
+   return STATUS_SUCCESSFUL;
++
+ }
+ 
+ /**
+diff --git a/cpukit/include/rtems/score/schedulerimpl.h b/cpukit/include/rtems/score/schedulerimpl.h
+index dcc81fcbbf..b26a863c36 100644
+--- a/cpukit/include/rtems/score/schedulerimpl.h
++++ b/cpukit/include/rtems/score/schedulerimpl.h
+@@ -1324,6 +1324,149 @@ RTEMS_INLINE_ROUTINE Status_Control _Scheduler_Set(
+   return STATUS_SUCCESSFUL;
+ }
+ 
++RTEMS_INLINE_ROUTINE void _Scheduler_Migrate_To(
++  Thread_Control  *executing,
++  Per_CPU_Control *migration_cpu,
++  Priority_Node   *ceiling_priority
++)
++{
++  ISR_lock_Context         lock_context;
++  const Scheduler_Control *migration_scheduler;
++  const Scheduler_Control *home_scheduler;
++  Scheduler_Node 	  *home_node;
++  Scheduler_Node 	  *migration_node;
++  size_t          	   migration_scheduler_index;
++  ISR_lock_Context         scheduler_lock_context;
++  Per_CPU_Control         *cpu_self;
++
++  home_node = _Thread_Scheduler_get_home_node( executing );
++  home_scheduler = _Thread_Scheduler_get_home( executing );
++
++  _Scheduler_Acquire_critical( home_scheduler, &lock_context );
++  ( *home_scheduler->Operations.block )(
++    home_scheduler,
++    executing,
++    home_node
++  );
++  _Scheduler_Release_critical( home_scheduler, &lock_context );
++
++  migration_scheduler = _Scheduler_Get_by_CPU(migration_cpu);
++  migration_scheduler_index = _Scheduler_Get_index(migration_scheduler);
++  migration_node = _Thread_Scheduler_get_node_by_index(executing ,migration_scheduler_index);
++
++  _Thread_Scheduler_acquire_critical( executing, &scheduler_lock_context );
++  _Scheduler_Node_set_priority( migration_node, ceiling_priority->priority, false );
++  _Chain_Append_unprotected(
++    &executing->Scheduler.Scheduler_nodes,
++    &migration_node->Thread.Scheduler_node.Chain
++  );
++  _Chain_Append_unprotected(
++    &executing->Scheduler.Wait_nodes,
++    &migration_node->Thread.Wait_node
++  );
++  _Thread_Scheduler_release_critical( executing, &scheduler_lock_context );
++
++  _Scheduler_Acquire_critical( migration_scheduler, &lock_context );
++  ( *migration_scheduler->Operations.update_priority )(
++    migration_scheduler,
++    executing,
++    migration_node
++  );
++  ( *migration_scheduler->Operations.unblock )(
++    migration_scheduler,
++    executing,
++    migration_node
++  );
++  _Scheduler_Release_critical( migration_scheduler, &lock_context );
++}
++
++RTEMS_INLINE_ROUTINE void _Scheduler_Migrate_Back(
++  Thread_Control  *executing,
++  Per_CPU_Control *migration_cpu
++)
++{
++  ISR_lock_Context         lock_context;
++  ISR_lock_Context 	   scheduler_lock_context;
++  const Scheduler_Control *migration_scheduler;
++  const Scheduler_Control *home_scheduler;
++  Scheduler_Node 	  *home_node;
++  Scheduler_Node 	  *migration_node;
++  size_t 		   migration_scheduler_index;
++
++  migration_scheduler = _Scheduler_Get_by_CPU( migration_cpu );
++  migration_scheduler_index = _Scheduler_Get_index( migration_scheduler );
++  migration_node = _Thread_Scheduler_get_node_by_index(
++    executing,
++    migration_scheduler_index
++  );
++
++  _Scheduler_Acquire_critical( migration_scheduler, &lock_context );
++  _Thread_Scheduler_acquire_critical( executing, &scheduler_lock_context );
++  _Scheduler_Node_set_priority(
++    migration_node,
++    migration_scheduler->maximum_priority,
++    false
++  );
++  _Thread_Scheduler_release_critical( executing, &scheduler_lock_context );
++  ( *migration_scheduler->Operations.update_priority )(
++    migration_scheduler,
++    executing,
++    migration_node
++  );
++  ( *migration_scheduler->Operations.block )(
++    migration_scheduler,
++    executing,
++    migration_node
++  );
++  _Scheduler_Release_critical( migration_scheduler, &lock_context );
++
++  _Thread_Scheduler_acquire_critical( executing, &scheduler_lock_context );
++  _Chain_Extract_unprotected( &migration_node->Thread.Wait_node );
++  _Chain_Extract_unprotected( &migration_node->Thread.Scheduler_node.Chain );
++  _Thread_Scheduler_release_critical( executing, &scheduler_lock_context );
++  home_node = _Thread_Scheduler_get_home_node( executing );
++  home_scheduler = _Thread_Scheduler_get_home( executing );
++
++  _Scheduler_Acquire_critical( home_scheduler, &lock_context );
++  ( *home_scheduler->Operations.unblock )(
++    home_scheduler,
++    executing,
++    home_node
++  );
++  _Scheduler_Release_critical( home_scheduler, &lock_context );
++}
++
++RTEMS_INLINE_ROUTINE void _Scheduler_Change_migration_priority(
++  Thread_Control  *executing,
++  Per_CPU_Control *migration_cpu,
++  Priority_Node   *priority
++)
++{
++  const Scheduler_Control *migration_scheduler;
++  Scheduler_Node  	  *migration_node;
++  size_t  		   migration_scheduler_index;
++  ISR_lock_Context    	   scheduler_lock_context;
++  ISR_lock_Context         lock_context;
++
++  migration_scheduler = _Scheduler_Get_by_CPU( migration_cpu );
++  migration_scheduler_index = _Scheduler_Get_index( migration_scheduler );
++  migration_node = _Thread_Scheduler_get_node_by_index(
++   executing,
++   migration_scheduler_index
++  );
++
++  _Scheduler_Acquire_critical( migration_scheduler, &lock_context );
++  _Thread_Scheduler_acquire_critical( executing, &scheduler_lock_context );
++  _Scheduler_Node_set_priority( migration_node, priority->priority, false );
++  _Thread_Scheduler_release_critical( executing, &scheduler_lock_context );
++  ( *migration_scheduler->Operations.update_priority )(
++    migration_scheduler,
++    executing,
++    migration_node
++  );
++  _Scheduler_Release_critical( migration_scheduler, &lock_context );
++}
++
+ /** @} */
+ 
+ #ifdef __cplusplus
+diff --git a/cpukit/include/rtems/score/thread.h b/cpukit/include/rtems/score/thread.h
+index fd99e8bb77..91a8911cb7 100644
+--- a/cpukit/include/rtems/score/thread.h
++++ b/cpukit/include/rtems/score/thread.h
+@@ -38,6 +38,7 @@
+ #include <rtems/score/threadq.h>
+ #include <rtems/score/timestamp.h>
+ #include <rtems/score/watchdog.h>
++#include <rtems/score/ticket.h>
+ 
+ #if defined(RTEMS_SMP)
+ #include <rtems/score/processormask.h>
+@@ -871,6 +872,11 @@ struct _Thread_Control {
+    */
+   struct User_extensions_Iterator *last_user_extensions_iterator;
+ 
++  /**
++   * @brief Ticket node to manage hdga semaphore order.
++   */
++  Ticket_Node ticket;
++
+   /**
+    * @brief Variable length array of user extension pointers.
+    *
+diff --git a/cpukit/include/rtems/score/threadq.h b/cpukit/include/rtems/score/threadq.h
+index 522be03970..761a971275 100644
+--- a/cpukit/include/rtems/score/threadq.h
++++ b/cpukit/include/rtems/score/threadq.h
+@@ -370,6 +370,7 @@ typedef struct _Thread_queue_Heads {
+      * among the highest priority thread of each scheduler instance.
+      */
+     Chain_Control Fifo;
++    RBTree_Control Tree;
+ 
+ #if !defined(RTEMS_SMP)
+     /**
+diff --git a/cpukit/include/rtems/score/threadqimpl.h b/cpukit/include/rtems/score/threadqimpl.h
+index 24a2ba5e60..0c445b1a81 100644
+--- a/cpukit/include/rtems/score/threadqimpl.h
++++ b/cpukit/include/rtems/score/threadqimpl.h
+@@ -930,6 +930,21 @@ void _Thread_queue_Enqueue(
+   Thread_queue_Context          *queue_context
+ );
+ 
++void _Thread_queue_Enqueue2(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context,
++  Per_CPU_Control *cpu
++);
++
++void _Thread_queue_Enqueue_busy(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context
++);
++
+ #if defined(RTEMS_SMP)
+ /**
+  * @brief Enqueues the thread on the thread queue and busy waits for dequeue.
+@@ -961,6 +976,15 @@ Status_Control _Thread_queue_Enqueue_sticky(
+ );
+ #endif
+ 
++#if defined(RTEMS_SMP)
++Status_Control _Thread_queue_Enqueue_sticky_no_update(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context
++);
++#endif
++
+ /**
+  * @brief Extracts the thread from the thread queue, restores the default wait
+  * operations and restores the default thread lock.
+@@ -1110,8 +1134,17 @@ void _Thread_queue_Surrender(
+   Thread_queue_Context          *queue_context,
+   const Thread_queue_Operations *operations
+ );
+-
+ #if defined(RTEMS_SMP)
++void _Thread_queue_Surrender_and_Migrate(
++  Thread_queue_Queue            *queue,
++  Thread_queue_Heads            *heads,
++  Thread_Control                *previous_owner,
++  Thread_queue_Context          *queue_context,
++  const Thread_queue_Operations *operations,
++  Per_CPU_Control *cpu,
++  Priority_Node *priority
++);
++
+ /**
+  * @brief Surrenders the thread queue previously owned by the thread to the
+  * first enqueued thread.
+@@ -1141,6 +1174,18 @@ void _Thread_queue_Surrender_sticky(
+ );
+ #endif
+ 
++#if defined(RTEMS_SMP)
++void _Thread_queue_Surrender_sticky_and_migrate(
++  Thread_queue_Queue            *queue,
++  Thread_queue_Heads            *heads,
++  Thread_Control                *previous_owner,
++  Thread_queue_Context          *queue_context,
++  const Thread_queue_Operations *operations,
++  Per_CPU_Control *cpu,
++  Priority_Node *priority
++);
++#endif
++
+ /**
+  * @brief Checks if the thread queue queue is empty.
+  *
+@@ -1471,6 +1516,8 @@ extern const Thread_queue_Operations _Thread_queue_Operations_default;
+ 
+ extern const Thread_queue_Operations _Thread_queue_Operations_FIFO;
+ 
++extern const Thread_queue_Operations _Thread_queue_Operations_TICKET;
++
+ extern const Thread_queue_Operations _Thread_queue_Operations_priority;
+ 
+ extern const Thread_queue_Operations _Thread_queue_Operations_priority_inherit;
+diff --git a/cpukit/include/rtems/score/ticket.h b/cpukit/include/rtems/score/ticket.h
+new file mode 100644
+index 0000000000..fe095f6ed8
+--- /dev/null
++++ b/cpukit/include/rtems/score/ticket.h
+@@ -0,0 +1,187 @@
++/**
++ * @file
++ *
++ * @ingroup RTEMSScoreTicket
++ *
++ * @brief Ticket Handler API
++ */
++
++#ifndef _RTEMS_SCORE_TICKET_H
++#define _RTEMS_SCORE_TICKET_H
++
++#include <rtems/score/chain.h>
++#include <rtems/score/cpu.h>
++#include <rtems/score/rbtree.h>
++#include <rtems/score/thread.h>
++
++struct _Scheduler_Control;
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/**
++ * @brief The ticket number of the ticket
++ */
++typedef uint64_t Ticket_Control;
++
++#define TICKET_MINIMUM      0
++#define TICKET_DEFAULT_MAXIMUM      255
++
++/**
++ * @brief The from RTEMS provided macro to get the container of the node
++ */
++#define TICKET_NODE_OF_NODE( node ) \
++  RTEMS_CONTAINER_OF( node, Ticket_Node, Node.RBTree )
++
++typedef struct {
++  /**
++   * @brief Node component for a chain or red-black tree.
++   */
++  union {
++    Chain_Node Chain;
++    RBTree_Node RBTree;
++  } Node;
++
++  /**
++   * @brief The ticket number of the node
++   */
++  Ticket_Control ticket;
++
++  /**
++   * @brief The owner of this ticket
++   */
++  Thread_Control *owner;
++} Ticket_Node;
++
++RTEMS_INLINE_ROUTINE void _Ticket_Initialize_one(
++    RBTree_Control *tree,
++    Ticket_Node    *node
++)
++{
++  _RBTree_Initialize_one( tree, &node->Node.RBTree );
++}
++
++RTEMS_INLINE_ROUTINE void _Ticket_Node_initialize(
++  Ticket_Node    *node,
++  Ticket_Control  ticket
++)
++{
++  node->ticket = ticket;
++  _RBTree_Initialize_node( &node->Node.RBTree );
++}
++
++/**
++ * @brief Compares two tickets
++ *
++ * @param left The ticket control on the left hand side of the comparison.
++ * @param right THe RBTree_Node to get the ticket for the comparison from.
++ *
++ * @retval true The ticket on the left hand side of the comparison is smaller.
++ * @retval false The ticket on the left hand side of the comparison is greater of equal.
++ */
++RTEMS_INLINE_ROUTINE bool _Ticket_Less(
++  const void        *left,
++  const RBTree_Node *right
++)
++{
++  const Ticket_Control *the_left;
++  const Ticket_Node    *the_right;
++
++  the_left = (Ticket_Control *) left;
++  the_right = RTEMS_CONTAINER_OF( right, Ticket_Node, Node.RBTree );
++
++  return *the_left < the_right->ticket;
++}
++
++/**
++ * @brief Inserts ticket in to tree
++ *
++ * @param tree The tree to insert into
++ * @param node The node that gets inserted
++ * @param ticket The ticket number to compare
++ *
++ * @retval true The inserted node is the new minimum node according to the
++ *   specified less order function.
++ * @retval false The inserted node is not the new minimum node according to the
++ *   specified less order function.
++ */
++RTEMS_INLINE_ROUTINE bool _Ticket_Plain_insert(
++  RBTree_Control *tree,
++  Ticket_Node    *node,
++  Ticket_Control  ticket
++)
++{
++  return _RBTree_Insert_inline(
++    tree,
++    &node->Node.RBTree,
++    &ticket,
++    _Ticket_Less
++  );
++}
++
++/**
++ * @brief Extract the given node from the tree
++ *
++ * @param tree The tree to extract from
++ * @param node The node that gets extracted
++ *
++ */
++RTEMS_INLINE_ROUTINE void _Ticket_Plain_extract(
++  RBTree_Control *tree,
++  Ticket_Node    *node
++)
++{
++  _RBTree_Extract( tree, &node->Node.RBTree );
++}
++
++/**
++ * @brief Gets the node with the smallest ticket number from the tree
++ *
++ * @param tree The tree to get the minimum node from
++ *
++ * @return The minimum ticket node
++ */
++RTEMS_INLINE_ROUTINE RBTree_Node *_Ticket_Get_minimum_node(
++  const RBTree_Control *tree
++)
++{
++  return _RBTree_Minimum( tree);
++}
++
++/**
++ * @brief Sets the task owner of this node
++ *
++ * @param node the ticket node to set the owner
++ * @param executing the owner to set
++ */
++RTEMS_INLINE_ROUTINE void _Ticket_Set_owner(
++  Ticket_Node    *node,
++  Thread_Control *executing
++)
++{
++  node->owner = executing;
++}
++
++/**
++ * @brief Returns the owner of this ticket node
++ *
++ * @param node the ticket node to get the owner
++ *
++ * @return executing the owner of this node
++ */
++RTEMS_INLINE_ROUTINE Thread_Control *_Ticket_Get_owner(
++  Ticket_Node *node
++)
++{
++  return node->owner;
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++/** @} */
++
++#endif
++/* end of include file */
+diff --git a/cpukit/rtems/src/semcreate.c b/cpukit/rtems/src/semcreate.c
+index dc4e02cd97..b5f40d0ec5 100644
+--- a/cpukit/rtems/src/semcreate.c
++++ b/cpukit/rtems/src/semcreate.c
+@@ -28,7 +28,10 @@
+ #include <rtems/sysinit.h>
+ 
+ #define SEMAPHORE_KIND_MASK ( RTEMS_SEMAPHORE_CLASS | RTEMS_INHERIT_PRIORITY \
+-  | RTEMS_PRIORITY_CEILING | RTEMS_MULTIPROCESSOR_RESOURCE_SHARING )
++  | RTEMS_PRIORITY_CEILING | RTEMS_MULTIPROCESSOR_RESOURCE_SHARING \
++  | RTEMS_DISTRIBUTED_PRIORITY_CEILING | RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_SHORT \
++  | RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_LONG | RTEMS_HYPERPERIOD_DEPENDENCY_GRAPH_APPROACH \
++  | RTEMS_DISTRIBUTED_FLEXIBLE_LOCKING_LONG | RTEMS_MULTIPROCESSOR_PRIORITY_CEILING)
+ 
+ rtems_status_code rtems_semaphore_create(
+   rtems_name           name,
+@@ -105,9 +108,78 @@ rtems_status_code rtems_semaphore_create(
+      */
+     variant = SEMAPHORE_VARIANT_MUTEX_PRIORITY_CEILING;
+ #endif
+-  } else {
+-    return RTEMS_NOT_DEFINED;
+-  }
++  } else if (
++      mutex_with_protocol
++	== ( RTEMS_BINARY_SEMAPHORE | RTEMS_DISTRIBUTED_PRIORITY_CEILING |  \
++	    RTEMS_GLOBAL)
++    ) {
++  #if defined(RTEMS_SMP)
++      variant = SEMAPHORE_VARIANT_DPCP;
++  #else
++      /*
++       * Use normal PCP on uni-processor
++       */
++      variant = SEMAPHORE_VARIANT_MUTEX_PRIORITY_CEILING;
++  #endif
++    }else if (
++      mutex_with_protocol == (RTEMS_BINARY_SEMAPHORE | \
++	  RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_SHORT | RTEMS_FIFO | \
++          RTEMS_GLOBAL )
++    ) {
++  #if defined(RTEMS_SMP)
++      variant = SEMAPHORE_VARIANT_FMLPS;
++  #else
++      return RTEMS_MP_NOT_CONFIGURED;
++  #endif
++    } else if (
++	mutex_with_protocol == (RTEMS_BINARY_SEMAPHORE | \
++	RTEMS_FLEXIBLE_MULTIPROCESSOR_LOCKING_LONG | RTEMS_FIFO | \
++	    RTEMS_GLOBAL )
++      ) {
++    #if defined(RTEMS_SMP)
++	variant = SEMAPHORE_VARIANT_FMLPL;
++    #else
++	return RTEMS_MP_NOT_CONFIGURED;
++    #endif
++    } else if (
++	mutex_with_protocol
++	  == ( RTEMS_BINARY_SEMAPHORE | RTEMS_DISTRIBUTED_FLEXIBLE_LOCKING_LONG | RTEMS_GLOBAL)
++      ) {
++    #if defined(RTEMS_SMP)
++	variant = SEMAPHORE_VARIANT_DFLPL;
++    #else
++	/*
++	 * Use normal PCP on uni-processor
++	 */
++	variant = RTEMS_MP_NOT_CONFIGURED;
++    #endif
++      }else if (
++	mutex_with_protocol
++	  == ( RTEMS_BINARY_SEMAPHORE | RTEMS_MULTIPROCESSOR_PRIORITY_CEILING)
++      ) {
++    #if defined(RTEMS_SMP)
++	variant = SEMAPHORE_VARIANT_MPCP;
++    #else
++	/*
++	 * Use normal PCP on uni-processor
++	 */
++	variant = RTEMS_MP_NOT_CONFIGURED;
++    #endif
++     }else if (
++	mutex_with_protocol
++	  == ( RTEMS_BINARY_SEMAPHORE | RTEMS_HYPERPERIOD_DEPENDENCY_GRAPH_APPROACH | RTEMS_GLOBAL)
++      ) {
++    #if defined(RTEMS_SMP)
++	variant = SEMAPHORE_VARIANT_HDGA;
++    #else
++	/*
++	 * Use normal PCP on uni-processor
++	 */
++	variant = RTEMS_MP_NOT_CONFIGURED;
++    #endif
++      }else {
++  return RTEMS_NOT_DEFINED;
++}
+ 
+   the_semaphore = _Semaphore_Allocate();
+ 
+@@ -210,6 +282,108 @@ rtems_status_code rtems_semaphore_create(
+         status = STATUS_INVALID_PRIORITY;
+       }
+ 
++      break;
++    case SEMAPHORE_VARIANT_DPCP:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _DPCP_Initialize(
++          &the_semaphore->Core_control.DPCP,
++          scheduler,
++          priority,
++          executing,
++          count == 0
++        );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
++      break;
++    case SEMAPHORE_VARIANT_FMLPS:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _FMLPS_Initialize(
++	 &the_semaphore->Core_control.FMLPS,
++	 scheduler,
++	 priority,
++	 executing,
++	 count == 0
++       );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
++      break;
++    case SEMAPHORE_VARIANT_FMLPL:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _FMLPL_Initialize(
++	 &the_semaphore->Core_control.FMLPL,
++	 scheduler,
++	 priority,
++	 executing,
++	 count == 0
++       );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
++      break;
++    case SEMAPHORE_VARIANT_DFLPL:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _DFLPL_Initialize(
++	 &the_semaphore->Core_control.DFLPL,
++	 scheduler,
++	 priority,
++	 executing,
++	 count == 0
++       );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
++      break;
++    case SEMAPHORE_VARIANT_MPCP:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _MPCP_Initialize(
++	 &the_semaphore->Core_control.MPCP,
++	 scheduler,
++	 priority,
++	 executing,
++	 count == 0
++       );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
++      break;
++    case SEMAPHORE_VARIANT_HDGA:
++      scheduler = _Thread_Scheduler_get_home( executing );
++      priority = _RTEMS_Priority_To_core( scheduler, priority_ceiling, &valid );
++
++      if ( valid ) {
++        status = _HDGA_Initialize(
++	 &the_semaphore->Core_control.HDGA,
++	 scheduler,
++	 priority_ceiling,
++	 executing,
++	 count == 0
++       );
++      } else {
++        status = STATUS_INVALID_PRIORITY;
++      }
++
+       break;
+ #endif
+     default:
+diff --git a/cpukit/rtems/src/semdelete.c b/cpukit/rtems/src/semdelete.c
+index a9fb863814..08a5f4e35b 100644
+--- a/cpukit/rtems/src/semdelete.c
++++ b/cpukit/rtems/src/semdelete.c
+@@ -68,6 +68,30 @@ rtems_status_code rtems_semaphore_delete(
+     case SEMAPHORE_VARIANT_MRSP:
+       status = _MRSP_Can_destroy( &the_semaphore->Core_control.MRSP );
+       break;
++
++    case SEMAPHORE_VARIANT_DPCP:
++      status = _DPCP_Can_destroy( &the_semaphore->Core_control.DPCP );
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPS:
++      status = _FMLPS_Can_destroy( &the_semaphore->Core_control.FMLPS );
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPL:
++      status = _FMLPL_Can_destroy( &the_semaphore->Core_control.FMLPL);
++      break;
++
++    case SEMAPHORE_VARIANT_DFLPL:
++      status = _DFLPL_Can_destroy( &the_semaphore->Core_control.DFLPL);
++      break;
++
++    case SEMAPHORE_VARIANT_MPCP:
++      status = _MPCP_Can_destroy( &the_semaphore->Core_control.MPCP);
++      break;
++
++    case SEMAPHORE_VARIANT_HDGA:
++      status = _HDGA_Can_destroy( &the_semaphore->Core_control.HDGA);
++      break;
+ #endif
+     default:
+       _Assert(
+@@ -94,6 +118,30 @@ rtems_status_code rtems_semaphore_delete(
+     case SEMAPHORE_VARIANT_MRSP:
+       _MRSP_Destroy( &the_semaphore->Core_control.MRSP, &queue_context );
+       break;
++
++    case SEMAPHORE_VARIANT_DPCP:
++      _DPCP_Destroy( &the_semaphore->Core_control.DPCP, &queue_context );
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPS:
++      _FMLPS_Destroy( &the_semaphore->Core_control.FMLPS, &queue_context );
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPL:
++      _FMLPL_Destroy( &the_semaphore->Core_control.FMLPL, &queue_context );
++      break;
++
++    case SEMAPHORE_VARIANT_DFLPL:
++      _DFLPL_Destroy( &the_semaphore->Core_control.DFLPL, &queue_context );
++      break;
++
++    case SEMAPHORE_VARIANT_MPCP:
++      _MPCP_Destroy( &the_semaphore->Core_control.MPCP, &queue_context );
++      break;
++
++    case SEMAPHORE_VARIANT_HDGA:
++      _HDGA_Destroy( &the_semaphore->Core_control.HDGA, &queue_context );
++      break;
+ #endif
+     default:
+       _Assert(
+diff --git a/cpukit/rtems/src/semflush.c b/cpukit/rtems/src/semflush.c
+index b7e8786f76..db10739c10 100644
+--- a/cpukit/rtems/src/semflush.c
++++ b/cpukit/rtems/src/semflush.c
+@@ -54,6 +54,36 @@ rtems_status_code rtems_semaphore_flush( rtems_id id )
+         &queue_context
+       );
+       return RTEMS_NOT_DEFINED;
++    case SEMAPHORE_VARIANT_DPCP:
++      _Thread_queue_Release(
++        &the_semaphore->Core_control.Wait_queue,
++        &queue_context
++      );
++      return RTEMS_NOT_DEFINED;
++    case SEMAPHORE_VARIANT_FMLPS:
++      _Thread_queue_Release(
++        &the_semaphore->Core_control.Wait_queue,
++        &queue_context
++      );
++      return RTEMS_NOT_DEFINED;
++    case SEMAPHORE_VARIANT_FMLPL:
++      _Thread_queue_Release(
++        &the_semaphore->Core_control.Wait_queue,
++        &queue_context
++      );
++      return RTEMS_NOT_DEFINED;
++    case SEMAPHORE_VARIANT_DFLPL:
++      _Thread_queue_Release(
++        &the_semaphore->Core_control.Wait_queue,
++        &queue_context
++      );
++      return RTEMS_NOT_DEFINED;
++    case SEMAPHORE_VARIANT_MPCP:
++      _Thread_queue_Release(
++        &the_semaphore->Core_control.Wait_queue,
++        &queue_context
++      );
++      return RTEMS_NOT_DEFINED;
+ #endif
+     default:
+       _Assert(
+diff --git a/cpukit/rtems/src/semobtain.c b/cpukit/rtems/src/semobtain.c
+index 2f73166df0..43e0b18f87 100644
+--- a/cpukit/rtems/src/semobtain.c
++++ b/cpukit/rtems/src/semobtain.c
+@@ -46,8 +46,46 @@ THREAD_QUEUE_OBJECT_ASSERT(
+   Core_control.MRSP.Wait_queue,
+   SEMAPHORE_CONTROL_MRSP
+ );
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.MRSP.Wait_queue,
++  SEMAPHORE_CONTROL_DPCP
++);
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.FMLPS.Wait_queue,
++  SEMAPHORE_CONTROL_FMLPS
++);
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.FMLPL.Wait_queue,
++  SEMAPHORE_CONTROL_FMLPL
++);
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.DFLPL.Wait_queue,
++  SEMAPHORE_CONTROL_DFLPL
++);
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.HDGA.Wait_queue,
++  SEMAPHORE_CONTROL_HDGA
++);
++
++THREAD_QUEUE_OBJECT_ASSERT(
++  Semaphore_Control,
++  Core_control.MPCP.Wait_queue,
++  SEMAPHORE_CONTROL_MPCP
++);
+ #endif
+ 
++
++
+ rtems_status_code rtems_semaphore_obtain(
+   rtems_id        id,
+   rtems_option    option_set,
+@@ -118,6 +156,54 @@ rtems_status_code rtems_semaphore_obtain(
+         &queue_context
+       );
+       break;
++    case SEMAPHORE_VARIANT_DPCP:
++      status = _DPCP_Seize(
++        &the_semaphore->Core_control.DPCP,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_FMLPS:
++      status = _FMLPS_Seize(
++        &the_semaphore->Core_control.FMLPS,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_FMLPL:
++      status = _FMLPL_Seize(
++        &the_semaphore->Core_control.FMLPL,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_DFLPL:
++      status = _DFLPL_Seize(
++        &the_semaphore->Core_control.DFLPL,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_HDGA:
++      status = _HDGA_Seize(
++        &the_semaphore->Core_control.HDGA,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_MPCP:
++      status = _MPCP_Seize(
++        &the_semaphore->Core_control.MPCP,
++        executing,
++        wait,
++        &queue_context
++      );
++      break;
+ #endif
+     default:
+       _Assert(
+diff --git a/cpukit/rtems/src/semrelease.c b/cpukit/rtems/src/semrelease.c
+index 40860a1ea9..baac73d342 100644
+--- a/cpukit/rtems/src/semrelease.c
++++ b/cpukit/rtems/src/semrelease.c
+@@ -93,7 +93,50 @@ rtems_status_code rtems_semaphore_release( rtems_id id )
+         &queue_context
+       );
+       break;
++    case SEMAPHORE_VARIANT_DPCP:
++      status = _DPCP_Surrender(
++        &the_semaphore->Core_control.DPCP,
++        executing,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_FMLPS:
++      status = _FMLPS_Surrender(
++        &the_semaphore->Core_control.FMLPS,
++        executing,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_FMLPL:
++      status = _FMLPL_Surrender(
++        &the_semaphore->Core_control.FMLPL,
++        executing,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_DFLPL:
++      status = _DFLPL_Surrender(
++        &the_semaphore->Core_control.DFLPL,
++        executing,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_HDGA:
++      status = _HDGA_Surrender(
++        &the_semaphore->Core_control.HDGA,
++        executing,
++        &queue_context
++      );
++      break;
++    case SEMAPHORE_VARIANT_MPCP:
++      status = _MPCP_Surrender(
++        &the_semaphore->Core_control.MPCP,
++        executing,
++        &queue_context
++      );
++      break;
+ #endif
++
+     default:
+       _Assert( the_semaphore->variant == SEMAPHORE_VARIANT_COUNTING );
+       status = _CORE_semaphore_Surrender(
+diff --git a/cpukit/rtems/src/semsetpriority.c b/cpukit/rtems/src/semsetpriority.c
+index 508dca5a12..1a7cd8ada9 100644
+--- a/cpukit/rtems/src/semsetpriority.c
++++ b/cpukit/rtems/src/semsetpriority.c
+@@ -95,9 +95,36 @@ static rtems_status_code _Semaphore_Set_priority(
+         );
+       }
+ 
++      sc = RTEMS_SUCCESSFUL;
++      break;
++    case SEMAPHORE_VARIANT_MPCP:
++        if ( new_priority != RTEMS_CURRENT_PRIORITY ) {
++           _MPCP_Set_priority(
++             &the_semaphore->Core_control.MPCP,
++             scheduler,
++             core_priority
++           );
++         }
++
++         sc = RTEMS_SUCCESSFUL;
++         break;
++    case SEMAPHORE_VARIANT_DPCP:
++      old_priority = _DPCP_Get_priority(
++        &the_semaphore->Core_control.DPCP
++      );
++
++      if ( new_priority != RTEMS_CURRENT_PRIORITY ) {
++        _DPCP_Set_priority(
++          &the_semaphore->Core_control.DPCP,
++          scheduler,
++          core_priority
++        );
++      }
++
+       sc = RTEMS_SUCCESSFUL;
+       break;
+ #endif
++
+     default:
+       _Assert(
+         the_semaphore->variant == SEMAPHORE_VARIANT_MUTEX_INHERIT_PRIORITY
+diff --git a/cpukit/rtems/src/semsetprocessor.c b/cpukit/rtems/src/semsetprocessor.c
+new file mode 100644
+index 0000000000..fd3691bd06
+--- /dev/null
++++ b/cpukit/rtems/src/semsetprocessor.c
+@@ -0,0 +1,101 @@
++/**
++ * @file
++ *
++ * @brief RTEMS Semaphore Release
++ * @ingroup ClassicSem Semaphores
++ *
++ * This file contains the implementation of the Classic API directive
++ * rtems_semaphore_release().
++ */
++
++/*
++ *  COPYRIGHT (c) 1989-2014.
++ *  On-Line Applications Research Corporation (OAR).
++ *
++ *  The license and distribution terms for this file may be
++ *  found in the file LICENSE in this distribution or at
++ *  http://www.rtems.org/license/LICENSE.
++ */
++
++#if HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <rtems/rtems/semimpl.h>
++#include <rtems/rtems/statusimpl.h>
++
++rtems_status_code rtems_semaphore_set_processor(
++  rtems_id id,
++  int      cpu
++)
++{
++  Semaphore_Control   *the_semaphore;
++  Thread_queue_Context queue_context;
++  ISR_lock_Context     lock_context;
++  Status_Control       status;
++
++  the_semaphore = _Semaphore_Get( id, &queue_context );
++
++  if ( the_semaphore == NULL ) {
++#if defined(RTEMS_MULTIPROCESSING)
++    return _Semaphore_MP_Release( id );
++#else
++    return RTEMS_INVALID_ID;
++#endif
++  }
++
++  _Thread_queue_Context_set_MP_callout(
++    &queue_context,
++    _Semaphore_Core_mutex_mp_support
++  );
++  switch ( the_semaphore->variant ) {
++    case SEMAPHORE_VARIANT_MUTEX_INHERIT_PRIORITY:
++      status =  RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_MUTEX_PRIORITY_CEILING:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_MUTEX_NO_PROTOCOL:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_SIMPLE_BINARY:
++      status = RTEMS_NOT_DEFINED;
++      break;
++#if defined(RTEMS_SMP)
++    case SEMAPHORE_VARIANT_MRSP:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_DPCP:
++     _DPCP_Set_CPU(
++       &the_semaphore->Core_control.DPCP,
++       _Per_CPU_Get_by_index(cpu),
++       &queue_context
++     );
++     status = STATUS_SUCCESSFUL;
++     break;
++    case SEMAPHORE_VARIANT_FMLPS:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_FMLPL:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_DFLPL:
++      _DFLPL_Set_CPU(
++        &the_semaphore->Core_control.DFLPL,
++	_Per_CPU_Get_by_index(cpu),
++	&queue_context
++      );
++      status = STATUS_SUCCESSFUL;
++      break;
++    case SEMAPHORE_VARIANT_HDGA:
++      status = RTEMS_NOT_DEFINED;
++      break;
++#endif
++    default:
++      _Assert( the_semaphore->variant == SEMAPHORE_VARIANT_COUNTING );
++      status = RTEMS_NOT_DEFINED;
++      break;
++  }
++
++  return _Status_Get( status );
++}
+diff --git a/cpukit/rtems/src/semticket.c b/cpukit/rtems/src/semticket.c
+new file mode 100644
+index 0000000000..5e1e9a2f37
+--- /dev/null
++++ b/cpukit/rtems/src/semticket.c
+@@ -0,0 +1,108 @@
++/**
++ * @file
++ *
++ * @brief RTEMS Semaphore Release
++ * @ingroup ClassicSem Semaphores
++ *
++ * This file contains the implementation of the Classic API directive
++ * rtems_semaphore_release().
++ */
++
++/*
++ *  COPYRIGHT (c) 1989-2014.
++ *  On-Line Applications Research Corporation (OAR).
++ *
++ *  The license and distribution terms for this file may be
++ *  found in the file LICENSE in this distribution or at
++ *  http://www.rtems.org/license/LICENSE.
++ */
++
++#if HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <rtems/rtems/semimpl.h>
++#include <rtems/rtems/statusimpl.h>
++
++rtems_status_code rtems_semaphore_ticket( rtems_id id, rtems_id tid, int position )
++{
++  Semaphore_Control    *the_semaphore;
++  Thread_queue_Context  queue_context;
++  ISR_lock_Context      lock_context;
++  Thread_Control       *executing;
++  Status_Control        status;
++
++  executing = _Thread_Get( tid, &lock_context );
++  _ISR_lock_ISR_enable( &lock_context );
++
++  the_semaphore = _Semaphore_Get( id, &queue_context );
++
++  if ( the_semaphore == NULL ) {
++#if defined(RTEMS_MULTIPROCESSING)
++    return _Semaphore_MP_Release( id );
++#else
++    return RTEMS_INVALID_ID;
++#endif
++  }
++
++  if ( executing == NULL ) {
++    return RTEMS_INVALID_ID;
++  }
++
++  _Thread_queue_Context_set_MP_callout(
++    &queue_context,
++    _Semaphore_Core_mutex_mp_support
++  );
++
++  switch ( the_semaphore->variant ) {
++    case SEMAPHORE_VARIANT_MUTEX_INHERIT_PRIORITY:
++      status =  RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_MUTEX_PRIORITY_CEILING:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_MUTEX_NO_PROTOCOL:
++      status = RTEMS_NOT_DEFINED;
++      break;
++    case SEMAPHORE_VARIANT_SIMPLE_BINARY:
++      status = RTEMS_NOT_DEFINED;
++      break;
++#if defined(RTEMS_SMP)
++    case SEMAPHORE_VARIANT_MRSP:
++      status = RTEMS_NOT_DEFINED;
++      break;
++
++    case SEMAPHORE_VARIANT_DPCP:
++      status = RTEMS_NOT_DEFINED;
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPS:
++      status = RTEMS_NOT_DEFINED;
++      break;
++
++    case SEMAPHORE_VARIANT_FMLPL:
++      status = RTEMS_NOT_DEFINED;
++      break;
++
++    case SEMAPHORE_VARIANT_DFLPL:
++      status = RTEMS_NOT_DEFINED;
++      break;
++
++    case SEMAPHORE_VARIANT_HDGA:
++      status = _HDGA_Set_thread(
++		 &the_semaphore->Core_control.HDGA,
++		 executing,
++		 &queue_context,
++		 position
++	       );
++      break;
++#endif
++
++    default:
++      _Assert( the_semaphore->variant == SEMAPHORE_VARIANT_COUNTING );
++      status = RTEMS_NOT_DEFINED;
++      break;
++  }
++
++  return _Status_Get( status );
++}
+diff --git a/cpukit/score/src/threadinitialize.c b/cpukit/score/src/threadinitialize.c
+index 83c689eee4..0901b6bba3 100644
+--- a/cpukit/score/src/threadinitialize.c
++++ b/cpukit/score/src/threadinitialize.c
+@@ -248,6 +248,9 @@ bool _Thread_Initialize(
+     &the_thread->Real_priority
+   );
+ 
++  the_thread->ticket.owner = the_thread;
++  the_thread->ticket.ticket = 0;
++
+ #if defined(RTEMS_SMP)
+   RTEMS_STATIC_ASSERT( THREAD_SCHEDULER_BLOCKED == 0, Scheduler_state );
+   the_thread->Scheduler.home_scheduler = scheduler;
+diff --git a/cpukit/score/src/threadqenqueue.c b/cpukit/score/src/threadqenqueue.c
+index d2e8c48381..b03bbd9d13 100644
+--- a/cpukit/score/src/threadqenqueue.c
++++ b/cpukit/score/src/threadqenqueue.c
+@@ -25,6 +25,7 @@
+ #include <rtems/score/threaddispatch.h>
+ #include <rtems/score/threadimpl.h>
+ #include <rtems/score/status.h>
++#include <rtems/score/schedulerimpl.h>
+ #include <rtems/score/watchdogimpl.h>
+ 
+ #define THREAD_QUEUE_INTEND_TO_BLOCK \
+@@ -451,6 +452,143 @@ void _Thread_queue_Enqueue(
+   _Thread_Dispatch_direct( cpu_self );
+ }
+ 
++void _Thread_queue_Enqueue2(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context,
++  Per_CPU_Control *cpu
++)
++{
++  Per_CPU_Control *cpu_self;
++  bool             success;
++
++  cpu_self = cpu;
++  _Assert( queue_context->enqueue_callout != NULL );
++
++#if defined(RTEMS_MULTIPROCESSING)
++  if ( _Thread_MP_Is_receive( the_thread ) && the_thread->receive_packet ) {
++    the_thread = _Thread_MP_Allocate_proxy( queue_context->thread_state );
++  }
++#endif
++
++  _Thread_Wait_claim( the_thread, queue );
++
++  if ( !_Thread_queue_Path_acquire_critical( queue, the_thread, queue_context ) ) {
++    _Thread_queue_Path_release_critical( queue_context );
++    _Thread_Wait_restore_default( the_thread );
++    _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++    _Thread_Wait_tranquilize( the_thread );
++    _Assert( queue_context->deadlock_callout != NULL );
++    ( *queue_context->deadlock_callout )( the_thread );
++    _Thread_Dispatch_enable( cpu_self );
++    return;
++  }
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_claim_finalize( the_thread, operations );
++  ( *operations->enqueue )( queue, the_thread, queue_context );
++
++  _Thread_queue_Path_release_critical( queue_context );
++
++  the_thread->Wait.return_code = STATUS_SUCCESSFUL;
++  _Thread_Wait_flags_set( the_thread, THREAD_QUEUE_INTEND_TO_BLOCK );
++  //cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++
++  ( *queue_context->enqueue_callout )(
++    queue,
++    the_thread,
++    cpu_self,
++    queue_context
++  );
++
++  /*
++   *  Set the blocking state for this thread queue in the thread.
++   */
++  _Thread_Set_state( the_thread, queue_context->thread_state );
++
++  /*
++   * At this point thread dispatching is disabled, however, we already released
++   * the thread queue lock.  Thus, interrupts or threads on other processors
++   * may already changed our state with respect to the thread queue object.
++   * The request could be satisfied or timed out.  This situation is indicated
++   * by the thread wait flags.  Other parties must not modify our thread state
++   * as long as we are in the THREAD_QUEUE_INTEND_TO_BLOCK thread wait state,
++   * thus we have to cancel the blocking operation ourself if necessary.
++   */
++  success = _Thread_Wait_flags_try_change_acquire(
++    the_thread,
++    THREAD_QUEUE_INTEND_TO_BLOCK,
++    THREAD_QUEUE_BLOCKED
++  );
++  if ( !success ) {
++    _Thread_Remove_timer_and_unblock( the_thread, queue );
++  }
++
++  _Thread_Priority_update( queue_context );
++  _Thread_Dispatch_direct( cpu_self );
++}
++
++void _Thread_queue_Enqueue_busy(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context
++)
++{
++  Per_CPU_Control *cpu_self;
++
++  _Assert( queue_context->enqueue_callout != NULL );
++
++#if defined(RTEMS_MULTIPROCESSING)
++  if ( _Thread_MP_Is_receive( the_thread ) && the_thread->receive_packet ) {
++    the_thread = _Thread_MP_Allocate_proxy( queue_context->thread_state );
++  }
++#endif
++
++  _Thread_Wait_claim( the_thread, queue );
++
++  if ( !_Thread_queue_Path_acquire_critical( queue, the_thread, queue_context ) ) {
++    _Thread_queue_Path_release_critical( queue_context );
++    _Thread_Wait_restore_default( the_thread );
++    _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++    _Thread_Wait_tranquilize( the_thread );
++    _Assert( queue_context->deadlock_callout != NULL );
++    ( *queue_context->deadlock_callout )( the_thread );
++    return;
++  }
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_claim_finalize( the_thread, operations );
++  ( *operations->enqueue )( queue, the_thread, queue_context );
++
++  _Thread_queue_Path_release_critical( queue_context );
++
++  the_thread->Wait.return_code = STATUS_SUCCESSFUL;
++  _Thread_Wait_flags_set( the_thread, THREAD_QUEUE_INTEND_TO_BLOCK );
++  //cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++
++  ( *queue_context->enqueue_callout )(
++    queue,
++    the_thread,
++    cpu_self,
++    queue_context
++  );
++
++  while (
++     _Thread_Wait_flags_get_acquire( the_thread ) == THREAD_QUEUE_INTEND_TO_BLOCK
++   ) {
++     /* Wait */
++   }
++
++
++  _Thread_Timer_remove( the_thread );
++  _Thread_Dispatch_direct( cpu_self );
++}
++
++
+ #if defined(RTEMS_SMP)
+ Status_Control _Thread_queue_Enqueue_sticky(
+   Thread_queue_Queue            *queue,
+@@ -514,6 +652,70 @@ Status_Control _Thread_queue_Enqueue_sticky(
+ }
+ #endif
+ 
++#if defined(RTEMS_SMP)
++Status_Control _Thread_queue_Enqueue_sticky_no_update(
++  Thread_queue_Queue            *queue,
++  const Thread_queue_Operations *operations,
++  Thread_Control                *the_thread,
++  Thread_queue_Context          *queue_context
++)
++{
++  Per_CPU_Control *cpu_self;
++
++  _Assert( queue_context->enqueue_callout != NULL );
++
++  _Thread_Wait_claim( the_thread, queue );
++
++  if ( !_Thread_queue_Path_acquire_critical( queue, the_thread, queue_context ) ) {
++    _Thread_queue_Path_release_critical( queue_context );
++    _Thread_Wait_restore_default( the_thread );
++    _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++    _Thread_Wait_tranquilize( the_thread );
++    ( *queue_context->deadlock_callout )( the_thread );
++    return _Thread_Wait_get_status( the_thread );
++  }
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  _Thread_Wait_claim_finalize( the_thread, operations );
++  ( *operations->enqueue )( queue, the_thread, queue_context );
++
++  _Thread_queue_Path_release_critical( queue_context );
++
++  the_thread->Wait.return_code = STATUS_SUCCESSFUL;
++  _Thread_Wait_flags_set( the_thread, THREAD_QUEUE_INTEND_TO_BLOCK );
++  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
++
++  if ( cpu_self->thread_dispatch_disable_level != 1 ) {
++    _Internal_error(
++      INTERNAL_ERROR_THREAD_QUEUE_ENQUEUE_STICKY_FROM_BAD_STATE
++    );
++  }
++
++  ( *queue_context->enqueue_callout )(
++    queue,
++    the_thread,
++    cpu_self,
++    queue_context
++  );
++
++  //_Thread_Priority_update( queue_context );
++  //_Thread_Priority_and_sticky_update( the_thread, 1 );
++  _Thread_Dispatch_enable( cpu_self );
++
++  while (
++    _Thread_Wait_flags_get_acquire( the_thread ) == THREAD_QUEUE_INTEND_TO_BLOCK
++  ) {
++    /* Wait */
++  }
++
++  _Thread_Wait_tranquilize( the_thread );
++  _Thread_Timer_remove( the_thread );
++  return _Thread_Wait_get_status( the_thread );
++}
++#endif
++
++
+ #if defined(RTEMS_MULTIPROCESSING)
+ static bool _Thread_queue_MP_set_callout(
+   Thread_Control             *the_thread,
+@@ -611,7 +813,6 @@ void _Thread_queue_Extract_critical(
+     the_thread,
+     queue_context
+   );
+-
+   _Thread_queue_Unblock_critical(
+     unblock,
+     queue,
+@@ -699,10 +900,63 @@ void _Thread_queue_Surrender(
+   if ( unblock ) {
+     _Thread_Remove_timer_and_unblock( new_owner, queue );
+   }
+-
+   _Thread_Dispatch_enable( cpu_self );
+ }
+ 
++void _Thread_queue_Surrender_and_Migrate(
++  Thread_queue_Queue            *queue,
++  Thread_queue_Heads            *heads,
++  Thread_Control                *previous_owner,
++  Thread_queue_Context          *queue_context,
++  const Thread_queue_Operations *operations,
++  Per_CPU_Control *cpu,
++  Priority_Node *priority
++)
++{
++  Thread_Control  *new_owner;
++  bool             unblock;
++  Per_CPU_Control *cpu_self;
++  ISR_lock_Context lock_context;
++
++  _Assert( heads != NULL );
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  new_owner = ( *operations->surrender )(
++    queue,
++    heads,
++    previous_owner,
++    queue_context
++  );
++  queue->owner = new_owner;
++
++#if defined(RTEMS_MULTIPROCESSING)
++  if ( !_Thread_queue_MP_set_callout( new_owner, queue_context ) )
++#endif
++  {
++    _Thread_Resource_count_increment( new_owner );
++  }
++
++  unblock = _Thread_queue_Make_ready_again( new_owner );
++
++  //cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _Thread_queue_Queue_release(
++    queue,
++    &queue_context->Lock_context.Lock_context
++  );
++
++  //_Thread_Priority_update( queue_context );
++
++  if ( unblock ) {
++    _Thread_Remove_timer_and_unblock( new_owner, queue );
++  }
++  _Thread_Wait_acquire_default_critical( new_owner, &lock_context );
++  _Scheduler_Migrate_To(new_owner, cpu, priority);
++
++  _Thread_Wait_release_default_critical( new_owner, &lock_context );
++
++  //_Thread_Dispatch_enable( cpu_self );
++}
++
+ #if defined(RTEMS_SMP)
+ void _Thread_queue_Surrender_sticky(
+   Thread_queue_Queue            *queue,
+@@ -714,6 +968,44 @@ void _Thread_queue_Surrender_sticky(
+ {
+   Thread_Control  *new_owner;
+   Per_CPU_Control *cpu_self;
++  _Assert( heads != NULL );
++
++  _Thread_queue_Context_clear_priority_updates( queue_context );
++  new_owner = ( *operations->surrender )(
++    queue,
++    heads,
++    previous_owner,
++    queue_context
++  );
++  queue->owner = new_owner;
++  _Thread_queue_Make_ready_again( new_owner );
++
++  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
++  _Thread_queue_Queue_release(
++    queue,
++    &queue_context->Lock_context.Lock_context
++  );
++  _Thread_Priority_and_sticky_update( previous_owner, -1 );
++  _Thread_Priority_and_sticky_update( new_owner, 0 );
++
++  _Thread_Dispatch_enable( cpu_self );
++}
++#endif
++
++#if defined(RTEMS_SMP)
++void _Thread_queue_Surrender_sticky_and_migrate(
++  Thread_queue_Queue            *queue,
++  Thread_queue_Heads            *heads,
++  Thread_Control                *previous_owner,
++  Thread_queue_Context          *queue_context,
++  const Thread_queue_Operations *operations,
++  Per_CPU_Control *cpu,
++  Priority_Node *priority
++)
++{
++  Thread_Control  *new_owner;
++  Per_CPU_Control *cpu_self;
++  ISR_lock_Context lock_context;
+ 
+   _Assert( heads != NULL );
+ 
+@@ -727,11 +1019,19 @@ void _Thread_queue_Surrender_sticky(
+   queue->owner = new_owner;
+   _Thread_queue_Make_ready_again( new_owner );
+ 
++
++
++
+   cpu_self = _Thread_queue_Dispatch_disable( queue_context );
+   _Thread_queue_Queue_release(
+     queue,
+     &queue_context->Lock_context.Lock_context
+   );
++
++  _Thread_Wait_acquire_default_critical( new_owner, &lock_context );
++  _Scheduler_Migrate_To(new_owner, cpu, priority);
++  _Thread_Wait_release_default_critical( new_owner, &lock_context );
++
+   _Thread_Priority_and_sticky_update( previous_owner, -1 );
+   _Thread_Priority_and_sticky_update( new_owner, 0 );
+   _Thread_Dispatch_enable( cpu_self );
+diff --git a/cpukit/score/src/threadqops.c b/cpukit/score/src/threadqops.c
+index dbabf9c8ac..7d75118948 100644
+--- a/cpukit/score/src/threadqops.c
++++ b/cpukit/score/src/threadqops.c
+@@ -21,6 +21,7 @@
+ #include <rtems/score/chainimpl.h>
+ #include <rtems/score/rbtreeimpl.h>
+ #include <rtems/score/schedulerimpl.h>
++#include <rtems/score/rbtree.h>
+ 
+ #define THREAD_QUEUE_CONTEXT_OF_PRIORITY_ACTIONS( priority_actions ) \
+   RTEMS_CONTAINER_OF( \
+@@ -1448,6 +1449,109 @@ static Thread_Control *_Thread_queue_Priority_inherit_surrender(
+   return first;
+ }
+ 
++static void _Thread_queue_TICKET_do_initialize(
++  Thread_queue_Queue   *queue,
++  Thread_Control       *executing,
++  Thread_queue_Context *queue_context,
++  Thread_queue_Heads   *heads
++)
++{
++  _Ticket_Initialize_one(&heads->Heads.Tree, &executing->ticket);
++}
++
++static void _Thread_queue_TICKET_do_enqueue(
++  Thread_queue_Queue   *queue,
++  Thread_Control       *the_thread,
++  Thread_queue_Context *queue_context,
++  Thread_queue_Heads   *heads
++)
++{
++  _Ticket_Plain_insert(
++    &heads->Heads.Tree,
++    &the_thread->ticket,
++    the_thread->ticket.ticket
++  );
++}
++
++static void _Thread_queue_TICKET_do_extract(
++  Thread_queue_Queue   *queue,
++  Thread_queue_Heads   *heads,
++  Thread_Control       *current_or_previous_owner,
++  Thread_queue_Context *queue_context,
++  Thread_Control       *the_thread
++)
++{
++
++  _Ticket_Plain_extract(
++    &heads->Heads.Tree,
++    &the_thread->ticket
++  );
++}
++
++static void _Thread_queue_TICKET_enqueue(
++  Thread_queue_Queue   *queue,
++  Thread_Control       *the_thread,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Queue_enqueue(
++    queue,
++    the_thread,
++    queue_context,
++    _Thread_queue_TICKET_do_initialize,
++    _Thread_queue_TICKET_do_enqueue
++  );
++}
++
++static void _Thread_queue_TICKET_extract(
++  Thread_queue_Queue   *queue,
++  Thread_Control       *the_thread,
++  Thread_queue_Context *queue_context
++)
++{
++  _Thread_queue_Queue_extract(
++    queue,
++    queue->heads,
++    NULL,
++    queue_context,
++    the_thread,
++    _Thread_queue_TICKET_do_extract
++  );
++}
++
++static Thread_Control *_Thread_queue_TICKET_first(
++  Thread_queue_Heads *heads
++)
++{
++  Ticket_Node *first;
++  first = TICKET_NODE_OF_NODE( _Ticket_Get_minimum_node( &heads->Heads.Tree ) );
++
++  return _Ticket_Get_owner(first);
++
++}
++
++static Thread_Control *_Thread_queue_TICKET_surrender(
++  Thread_queue_Queue   *queue,
++  Thread_queue_Heads   *heads,
++  Thread_Control       *previous_owner,
++  Thread_queue_Context *queue_context
++)
++{
++  Thread_Control *first;
++
++  first = _Thread_queue_TICKET_first( heads );
++  _Thread_queue_Queue_extract(
++    queue,
++    heads,
++    NULL,
++    queue_context,
++    first,
++    _Thread_queue_TICKET_do_extract
++  );
++
++  return first;
++}
++
+ const Thread_queue_Operations _Thread_queue_Operations_default = {
+   .priority_actions = _Thread_queue_Do_nothing_priority_actions,
+   .extract = _Thread_queue_Do_nothing_extract
+@@ -1458,6 +1562,14 @@ const Thread_queue_Operations _Thread_queue_Operations_default = {
+    */
+ };
+ 
++const Thread_queue_Operations _Thread_queue_Operations_FIFO_PIP = {
++  .priority_actions = _Thread_queue_Priority_inherit_priority_actions,
++  .enqueue = _Thread_queue_FIFO_enqueue,
++  .extract = _Thread_queue_FIFO_extract,
++  .surrender = _Thread_queue_FIFO_surrender,
++  .first = _Thread_queue_FIFO_first
++};
++
+ const Thread_queue_Operations _Thread_queue_Operations_FIFO = {
+   .priority_actions = _Thread_queue_Do_nothing_priority_actions,
+   .enqueue = _Thread_queue_FIFO_enqueue,
+@@ -1481,3 +1593,11 @@ const Thread_queue_Operations _Thread_queue_Operations_priority_inherit = {
+   .surrender = _Thread_queue_Priority_inherit_surrender,
+   .first = _Thread_queue_Priority_first
+ };
++
++const Thread_queue_Operations _Thread_queue_Operations_TICKET = {
++  .priority_actions = _Thread_queue_Do_nothing_priority_actions,
++  .enqueue = _Thread_queue_TICKET_enqueue,
++  .extract = _Thread_queue_TICKET_extract,
++  .surrender = _Thread_queue_TICKET_surrender,
++  .first = _Thread_queue_TICKET_first
++};
