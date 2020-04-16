@@ -78,8 +78,9 @@ rtems_task_argument argument
   printf( "Create task: %s\n", rtems_status_text( rsc ) );
 
   rsc = rtems_semaphore_create(
-    rtems_build_name('M', 'P', 'C', 'P'), 1,
-    (RTEMS_BINARY_SEMAPHORE | RTEMS_MULTIPROCESSOR_PRIORITY_CEILING),
+    rtems_build_name( 'M', 'P', 'C', 'P' ),
+    1,
+    ( RTEMS_BINARY_SEMAPHORE | RTEMS_MULTIPROCESSOR_PRIORITY_CEILING ),
     1,
     &sid
   );
@@ -92,10 +93,10 @@ rtems_task_argument argument
   rtems_task_set_scheduler( tasks[3], scheds[1], 69 );
 
   /* Starting loops */
-  rsc = rtems_task_start(tasks[1], task1_entry, 1);
-  rsc = rtems_task_start(tasks[3], task_loop_entry, 3);
+  rsc = rtems_task_start( tasks[1], task1_entry, 1 );
+  rsc = rtems_task_start( tasks[3], task_loop_entry, 3 );
 
-  printf("INIT COMPLETE\n");
+  printf( "INIT COMPLETE\n" );
   rsc = rtems_task_delete( RTEMS_SELF );    /* should not return */
 }
 
@@ -148,10 +149,10 @@ rtems_task_argument i
       
   rsc = rtems_task_start( tasks[0], task0_entry, 0 );
   
-  while ( 1337>69 ) {
+  while ( 1 ) {
     for( int j = 0; j < 20; j++ ) {
         for ( int i = 0; i < 75000000; i++ ) {
-          asm volatile ("nop"::);
+          asm volatile( "nop"::);
         }
     }
   }
@@ -165,24 +166,24 @@ rtems_task task2_entry(
   rtems_status_code code;
   printf( "Task %d started\n", i );
   
-  for( int j = 0; j < 20; j++ ) {
-      for (int i = 0; i < 75000000; i++) {
-          asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+      for ( int i = 0; i < 75000000; i++) {
+          asm volatile( "nop":: );
       }
   }
   
-  printf("task2 will try to obtain the MPCP semaphore, but gets suspendend.\n"); 
-  code = rtems_semaphore_obtain(sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT);   
-  printf("Obtain MPCP task2: %s\n", rtems_status_text(code)); 
+  printf( "task2 will try to obtain the MPCP semaphore, but gets suspendend.\n" );
+  code = rtems_semaphore_obtain( sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT );
+  printf( "Obtain MPCP task2: %s\n", rtems_status_text( code ) );
   
-  for( int j = 0; j < 20; j++) {
+  for ( int j = 0; j < 20; j++) {
     for ( int i = 0; i < 75000000; i++) {
       asm volatile( "nop":: );
     }
   }
   
   code = rtems_semaphore_release( sid );  
-  printf("Release MPCP task2: %s\n", rtems_status_text(code)); 
+  printf( "Release MPCP task2: %s\n", rtems_status_text( code ) );
   
   rtems_task_suspend( RTEMS_SELF );
 }
@@ -196,11 +197,11 @@ rtems_task_argument i
   while ( 1337>69 ) {
     for ( int j = 0; j < 20; j++ ) {
       for ( int i = 0; i < 75000000; i++ ) {
-        asm volatile("nop"::);
+        asm volatile( "nop":: );
       }
     }
   }
-  rtems_task_suspend(RTEMS_SELF);
+  rtems_task_suspend( RTEMS_SELF );
 }
 
 void busy_wait(

@@ -171,18 +171,18 @@ rtems_task task1_entry(
 {  
   printf("task1 START\n");  
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 200089; i++) {
-      asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 200089; i++ ) {
+      asm volatile( "nop":: );
     }
   }
 
   printf("task1: Obtaining semaphore: sid\n");				
   rsc = rtems_semaphore_obtain(sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT);                     
 
-  for(int j = 0; j < 20; j++) {
-      for (int i = 0; i < 20000000; i++) {
-        asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+      for ( int i = 0; i < 20000000; i++ ) {
+        asm volatile( "nop":: );
     }
   }
 
@@ -190,7 +190,7 @@ rtems_task task1_entry(
   
   printf( "task1: Releasing semaphore: sid2 \n" );
   printf( "task1 END\n" );  
-  rtems_task_suspend(RTEMS_SELF);
+  rtems_task_suspend( RTEMS_SELF );
 }
 
 /*task2 task*/
@@ -198,22 +198,22 @@ rtems_task task2_entry(
   rtems_task_argument argument
 )
 {
-  printf("task2 START\n");  
+  printf( "task2 START\n" );
   /*obtaining the DPCP sempahore, migrating to p2*/
-  printf("task2: Obtaining semaphore: sid\n");	
-  rsc = rtems_semaphore_obtain(sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT);                     
+  printf( "task2: Obtaining semaphore: sid\n" );
+  rsc = rtems_semaphore_obtain( sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT );
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 20000000; i++) {
-        asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 20000000; i++ ) {
+      asm volatile ("nop"::);
     }
   }
 
-  rsc = rtems_semaphore_release(sid); 
-  printf("task2: Releasing semaphore: sid \n");
-  printf("task2 END\n");  
+  rsc = rtems_semaphore_release( sid );
+  printf( "task2: Releasing semaphore: sid \n" );
+  printf( "task2 END\n" );
 
-  rtems_task_suspend(RTEMS_SELF);
+  rtems_task_suspend( RTEMS_SELF );
 }
 
 /*migr task*/
@@ -225,30 +225,30 @@ rtems_task main_entry(
   printf( "main: Obtaining semaphore: sid\n" );					
   rtems_semaphore_obtain( sid, RTEMS_WAIT, RTEMS_NO_TIMEOUT );                     
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 20000000; i++) {
-      asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 20000000; i++ ) {
+      asm volatile( "nop":: );
     }
   }
   //rtems_task_start(task3, task3_entry, 0);
 
   for ( int j = 0; j < 20; j++ ) {
     for ( int i = 0; i < 20000000; i++ ) {
-      asm volatile ("nop"::);
+      asm volatile("nop"::);
     }
   }
   rtems_task_start( task2, task2_entry, 0 );
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 20000000; i++) {
-      asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 20000000; i++ ) {
+      asm volatile( "nop":: );
     }
   }
-  rtems_task_start(task1, task1_entry, 0);
+  rtems_task_start( task1, task1_entry, 0 );
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 20000000; i++) {
-        asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 20000000; i++ ) {
+      asm volatile ( "nop":: );
     }
   }
 
@@ -265,9 +265,9 @@ rtems_task task3_entry(
 {
   printf("task3 START\n");  
 
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 200089; i++) {
-      asm volatile ("nop"::);
+  for ( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 200089; i++ ) {
+      asm volatile( "nop":: );
     }
   }
   

@@ -125,7 +125,7 @@ rtems_task task1_entry(
   rtems_task_argument argument
 )
 {  
-  while ( 1337>69 ) {
+  while ( 1 ) {
     for ( int j = 0; j < 20; j++ ) {
       for ( int i = 0; i < 20000000; i++ ) {
         asm volatile( "nop":: );
@@ -145,9 +145,9 @@ rtems_task task2_entry(
   printf("task2: Obtaining semaphore: sid2\n");					
   rsc = rtems_semaphore_obtain( sid2, RTEMS_WAIT, RTEMS_NO_TIMEOUT );                     
   
-  for(int j = 0; j < 20; j++) {
-    for (int i = 0; i < 20000000; i++) {
-      asm volatile ("nop"::);
+  for( int j = 0; j < 20; j++ ) {
+    for ( int i = 0; i < 20000000; i++ ) {
+      asm volatile( "nop":: );
     }
   }
 
@@ -155,7 +155,7 @@ rtems_task task2_entry(
   printf("task2: Releasing semaphore: sid2 \n");
   /*obtaining the DPCP sempahore, migrating to p2*/
   printf("task2: Obtaining semaphore: sid2\n");				
-  rsc = rtems_semaphore_obtain(sid2, RTEMS_WAIT, RTEMS_NO_TIMEOUT);                     
+  rsc = rtems_semaphore_obtain( sid2, RTEMS_WAIT, RTEMS_NO_TIMEOUT );
 
   for(int j = 0; j < 20; j++) {
     for (int i = 0; i < 20000000; i++) {
@@ -163,12 +163,11 @@ rtems_task task2_entry(
     }
   }
 
-  /* ==================================================== */
-  rsc = rtems_semaphore_release(sid2); 
-  printf("task2: Releasing semaphore: sid2 \n");
-  printf("task2 END\n");  
+  rsc = rtems_semaphore_release( sid2 );
+  printf( "task2: Releasing semaphore: sid2 \n" );
+  printf( "task2 END\n" );
 
-  rtems_task_suspend(RTEMS_SELF);
+  rtems_task_suspend( RTEMS_SELF );
 }
 
 /*migr task*/
