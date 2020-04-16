@@ -1,0 +1,13 @@
+﻿This file describes the directives and concepts tested by this test set.
+
+test set name: overhead
+
+directives:
+
+  - DFLPL/FMLPL functions (unlock/lock) (edit the right one before testing)
+
+concepts:
+
+  - This test should test the DFLPL/FMLPL update priority function. We first have the main task obtaining and migrate. On the sychronization processor BLOCK has a higher priority tahn main, thus BLOCK gets the processor and not the migrated task main. After a while BLOCK starts task3 which obtains the same DFLPL semaphore as main. Since main already has the sempahore locked it gets enqueued into a FIFO queue and
+inherits their priority to main which now has a higher priority than BLOCK and will preempt block on the synchronization processor.
+

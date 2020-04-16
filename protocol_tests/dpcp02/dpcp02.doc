@@ -1,0 +1,24 @@
+﻿This file describes the directives and concepts tested by this test set.
+
+test set name: overhead
+
+directives:
+
+  - DPCP functions (unlock/lock)
+
+concepts:
+
+  - This is the same test as dpcp01, except that it uses three cores and migr2 is starting on CPU#2
+  
+  - This test is a short test, to test how the programm is going to behave if there are two DPCP semaphores with different ceiling priority migrating 
+    on the same synchronization cpu. CPU#0 is the application processor and CPU#1 the synchronization processor.
+    Priority order of the tasks at the beginning migr2 > migr1 > task2 > task1
+    priority ceiling of the semaphores sid1 > sid2
+   
+    migr2, task2 obtains sid2 semaphore
+    migr1 obtains sid1 semaphore
+    task2 can only finish its critical section after the execution of migr1 and migr2  
+     
+    TEST OUTPUT:
+    see test_notes.txt
+

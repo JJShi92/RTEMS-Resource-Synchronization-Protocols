@@ -1,0 +1,54 @@
+﻿This file describes the directives and concepts tested by this test set.
+
+test set name: overhead
+
+directives:
+
+  - DPCP functions (unlock/lock)
+
+concepts:
+ This test is a short test, to test how the programm is going to behave if there are two DPCP semaphores with different ceiling priority migrating 
+ on the same synchronization cpu. CPU#0 is the application processor and CPU#1 the synchronization processor.
+ Priority order of the tasks at the beginning migr2 > migr1 > task2 > task1
+ priority ceiling of the semaphores sid1 > sid2
+ 
+ migr2, task2 obtains sid2 semaphore
+ migr1 obtains sid1 semaphore
+ task2 can only finish its critical section after the execution of migr1 and migr2  
+ 
+ 
+ Executing order of the tasks:
+      CPU#0         CPU#1
+ 1    migr2           -
+ 2    migr1         migr2
+ 3    task2         migr1    (task2 can't obtain the semaphore since migr2 
+                               owns it, so it has to wait for migr2 to release it. migr has to wait for
+                              migr1 to finish the execution so it can continue on the synchronization processor)
+ 4    task1         migr1
+ 5    migr1         migr2
+ 6    task1         migr2
+ 7    migr2         task2
+ 8    task1         task2
+ 9    task2          -
+ 10   task1         task2   //testing if I can obtain the same semaphore multiple times
+ 11   task2          -  
+ 12   task1
+ 
+  TEST OUTPUT:
+
+  migr2 START
+  migr2: Obtaining semaphore: sid2
+  migr1 START
+  migr1: Obtaining semaphore: sid1  //Preempting sid2 execution on sync cpu
+  task2 START                       //task2 can start now, since migr1 and migr2 on sync cpu  
+  task2: Obtaining semaphore: sid2  //tries to obtain, but can't since already owned by migr2 (gets suspended)
+  migr1: Releasing semaphore: sid1  //finishing execution of sid1, migr2 can continue on sync cpu  
+  migr1 END
+  migr2: Releasing semaphore: sid2  //finished execution of sid2, now task2 can obtain the semaphore and start executing 
+  migr2 END
+  task2: Releasing semaphore: sid2   
+  task2: Obtaining semaphore: sid2  //obtains the semaphore a second time 
+  task2: Releasing semaphore: sid2 
+  task2 END
+
+

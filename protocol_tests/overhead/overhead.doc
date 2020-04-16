@@ -1,0 +1,11 @@
+﻿This file describes the directives and concepts tested by this test set.
+
+test set name: overhead
+
+directives:
+
+  - Everything related to lock/unlock of the implemented protocols.
+
+concepts:
+
+  - Timestamps before and after code execution.

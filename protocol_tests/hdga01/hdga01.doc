@@ -1,0 +1,12 @@
+﻿This file describes the directives and concepts tested by this test set.
+
+test set name: overhead
+
+directives:
+
+  - HDGA functions (lock/unlock)
+  - rtems_semaphore_ticket
+
+concepts:
+
+  - Testing functionality of the HDGA implementation
