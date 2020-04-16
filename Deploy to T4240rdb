@@ -1,0 +1,47 @@
+Guide for deploying RTEMS applications on the T4240:
+This guide assumes that the image data is already created with RTEMS: powerpc qoriq_e6500_64
+
+This tests a deployed with a tftpd-hpa server.
+The config file in etc/default looked like this when I did the tests. Make sure only the tftp-hpa server is running 
+and not another tftp server. Also make sure the port is set to 69.
+
+# /etc/default/tftpd-hpa
+
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/home/jan/ba/tftpboot"
+TFTP_ADDRESS=":69"
+TFTP_OPTIONS="-l -c -s"
+
+===================tftp server commands
+sudo service tftpd-hpa start
+sudo service tftpd-hpa status
+sudo service tftpd-hpa restart
+
+
+Setup of the T4240:
+1. Connect Serial Cable with the USB Adapter.
+2. Connect the Cable with the UART Port on the T4240 on to a USB Port on the PC.
+3. Connect the T4240 to a router with a LAN cable.
+4. Connect you pc with the same router.
+
+I used minicom to capture the data send by the T4240 with the serial cable.
+-> sudo minicom -s 
+   to start with the config menu. Set the usb port in "Serial port setup"
+   
+Start the T4240 after you configure minicom.   
+Abort the autobbot of the board by pressing a random buttom.
+
+Now set up the ips in the board with these commands
+setenv serverip xxx.xxx.xxx.xxx Computer Ip 
+setenv ipaddr xxx.xxx.xxx.xxx Board Ip
+setenv gateway xxx.xxx.xxx.xxx Router Ip
+save everything with saveenv
+
+
+copy the dtb file and your RTEMS image into your tftp folder
+====================loading image to board
+tftp 1000000 dispatch.img
+tftp c00000 t4240rdb.dtb
+bootm 1000000 - c00000
+
+
