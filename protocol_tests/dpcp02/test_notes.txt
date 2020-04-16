@@ -1,0 +1,53 @@
+Delaying migr1 at the start, almost the same behavoir as with two cpus:
+
+migr2 START
+migr2: Obtaining semaphore: sid2
+migr1 START
+migr1: Obtaining semaphore: sid1
+task2 START
+task2: Obtaining semaphore: sid2
+migr1: Releasing semaphore: sid1 
+migr1 END
+migr2: Releasing semaphore: sid2 
+migr2 END
+task2: Releasing semaphore: sid2 
+task2: Obtaining semaphore: sid2
+task2: Releasing semaphore: sid2 
+task2 END
+
+
+Delaying migr2 at the start: Obtain order migr1(sid1) > task2(sid2) > migr2(sid2)
+Interesting here is the fact that upon delaying migr2, gives migr1 enough time to migrate to CPU#1 and task2 to 
+obtain semaphore sid2 before sid2 does. The execution order is working as intended:
+
+migr2 START
+migr1 START
+migr1: Obtaining semaphore: sid1
+task2 START
+task2: Obtaining semaphore: sid2
+migr2: Obtaining semaphore: sid2
+migr1: Releasing semaphore: sid1 
+migr1 END
+task2: Releasing semaphore: sid2 
+task2: Obtaining semaphore: sid2
+migr2: Releasing semaphore: sid2 
+migr2 END
+task2: Releasing semaphore: sid2 
+task2 END
+
+Delaying migr2 + task2 at the start. Obtain order migr1(sid1) > migr2(sid2) > task2(sid2)
+migr2 START
+migr1 START
+migr1: Obtaining semaphore: sid1
+task2 START
+migr2: Obtaining semaphore: sid2
+task2: Obtaining semaphore: sid2
+migr1: Releasing semaphore: sid1 
+migr1 END
+migr2: Releasing semaphore: sid2 
+migr2 END
+task2: Releasing semaphore: sid2 
+task2: Obtaining semaphore: sid2
+task2: Releasing semaphore: sid2 
+task2 END
+
