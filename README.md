@@ -12,3 +12,6 @@ This patch is based on the original RTEMS from commit c1a1f2c8da4993b03f0a8fadac
 Please download the RTEMS from its original release site (https://github.com/RTEMS/rtems), and then apply our patch.
 
         patch -p1 < r RTEMS_patch_resource_protocols.patch
+
+<br />
+If you want to deploy the RTEMS to T4240RDB board, you can follow the guide 'Deploy to T4240rdb'.
