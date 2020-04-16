@@ -1,5 +1,7 @@
 # RTEMS-Resource-Synchronization-Protocols
-The patch for supporting multiprocessor resource synchronization protocols on RTEMS
+The patch for supporting multiprocessor resource synchronization protocols on RTEMS.
+<br />
+protocol_tests are some test cases that can be used to verify the features of different protocols.
 <br />
 # Supported Protocols:
 DPCP, MPCP, FMLP, DFLP, and beta version of HDGA.
