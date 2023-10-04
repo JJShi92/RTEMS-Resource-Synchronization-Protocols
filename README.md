@@ -17,6 +17,6 @@ Please download the RTEMS from its original release site (https://github.com/RTE
 If you want to deploy the RTEMS to T4240RDB board, you can follow the guide 'Deploy to T4240rdb'.
 
 # RTEMS-5 Support:
-We support aforementationed protocols for RTEMS-5 (in folder RTEMS-5). In addition, the implementation for DGA has been formally verified.
+We support aforementationed protocols for RTEMS-5 (in folder RTEMS-5). In addition, the implementation for DGA has been formally verified (by Surya Subramanian).
 <br />
 The detailed deployment for verification can refer to [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS)
