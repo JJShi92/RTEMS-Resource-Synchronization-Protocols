@@ -46,14 +46,16 @@ The detailed deployment for verification can refer to [Protocol_Verification](ht
       3. Create a new folder `mkdir rtems-build` to store built files.
       4. Enter the `rtems-build` and execute `../rtems/configure --target=powerpc-rtems5 --enable-rtemsbsp=qoriq_e6500_32 --enable-smp --enable-tests=yes --enable-debug --prefix=/home/YOUR_DIC/rtems-build/`.
       5. Build the RTEMS `make install`.
-```
-├──  Home
-│   ├──  RTEMS
-│   │   ├──  rsb
-│   │   ├──  rtems
-|   |   ├──  build
-|   |   ├──  rtems-build
-``` 
+   The folder structure is as follows:
+    
+   ```
+   ├──  Home
+   │   ├──  RTEMS
+   │   │   ├──  rsb
+   │   │   ├──  rtems
+   |   |   ├──  build
+   |   |   ├──  rtems-build
+   ``` 
 2. Install Frama-C via `opam`, our verification is supported by Frama-C.25.0. Detailed installation guide can be found in [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS).
 3. Verification Deployment:
    1. Add all the function contracts in the location `/Home/YOUR_DIR/rtems/cpukit/ directory`.
