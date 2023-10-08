@@ -50,12 +50,27 @@ The detailed deployment for verification can refer to [Protocol_Verification](ht
 ├──  Home
 │   ├──  RTEMS
 │   │   ├──  rsb
-│   │   │     ├──   bare
-│   │   │     ├──   rtems
-│   │   │     ├──    source-builder
 │   │   ├──  rtems
 |   |   ├──  build
 |   |   ├──  rtems-build
 ``` 
 2. Install Frama-C via `opam`, our verification is supported by Frama-C.25.0. Detailed installation guide can be found in [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS).
 3. Verification Deployment:
+   1. Add all the function contracts in the location `/Home/YOUR_DIR/rtems/cpukit/ directory`.
+   2. Due to the limited support for C11 of Frama-C, the following files in `/Home/YOUR_DIR/rtems/cpukit/include/rtems/score/` have to be adjusted:
+      | File | Original code | Updated Code |
+      | ------ | ------ | ----- |
+      | cpustdatomic.h | Line number 45 and 46 | Replace Line 45 & 46 with #include <rtems/score/isrlevel.h> |
+      | threadq.h | Line number 399  | RTEMS_ZERO_LENGTH_ARRAY in array size should be removed |
+      | thread.h  | Line number 889 | RTEMS_ZERO_LENGTH_ARRAY in array size should be removed |
+      | percpu.h  | Line number 236 | after typedef struct { , add (int x;)   |
+   3. Enter the folder `/home/YOUR_DIC/rtems/cpukit/` and execute `eval $(opam env)`
+   4. The following command is applied to lunch the DGA verification in Frama-C:
+      ```
+      frama-c-gui -cpp-command '/home/YOUR_DIC/build/bin/powerpc-rtems5-gcc -C -E \
+      -I./include -I./score/cpu/powerpc/include/ \
+      -I/home/YOUR_DIC/rtems-build/powerpc-rtems5/c/qoriq_e6500_32/include/ \
+      -I/home/YOUR_DIC/build/lib/gcc/powerpc-rtems5/7.5.0/include \
+      -I/home/YOUR_DIC/build/powerpc-rtems5/include \
+      -nostdinc -include hdga_contracts_t.h' -machdep ppc_32 -cpp-frama-c-compliant -c11       include/rtems/score/hdgaimpl.h
+      ```
