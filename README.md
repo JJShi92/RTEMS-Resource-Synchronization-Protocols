@@ -62,10 +62,10 @@ The detailed deployment for verification can refer to [Protocol_Verification](ht
    2. Due to the limited support for C11 of Frama-C, the following files in `/Home/YOUR_DIR/rtems/cpukit/include/rtems/score/` have to be adjusted:
       | File | Original code | Updated Code |
       | ------ | ------ | ----- |
-      | cpustdatomic.h | Line number 45 and 46 | Replace Line 45 & 46 with #include <rtems/score/isrlevel.h> |
-      | threadq.h | Line number 399  | RTEMS_ZERO_LENGTH_ARRAY in array size should be removed |
-      | thread.h  | Line number 889 | RTEMS_ZERO_LENGTH_ARRAY in array size should be removed |
-      | percpu.h  | Line number 236 | after typedef struct { , add (int x;)   |
+      | cpustdatomic.h | Line number 45 and 46 | Replace Line 45 & 46 with `#include <rtems/score/isrlevel.h>`|
+      | threadq.h | Line number 399  | Remove RTEMS_ZERO_LENGTH_ARRAY in array size |
+      | thread.h  | Line number 889 | Remove RTEMS_ZERO_LENGTH_ARRAY in array size |
+      | percpu.h  | Line number 236 | Add `int x;` after typedef struct { |
    3. Enter the folder `/home/YOUR_DIC/rtems/cpukit/` and execute `eval $(opam env)`
    4. The following command is applied to lunch the DGA verification in Frama-C:
       ```
