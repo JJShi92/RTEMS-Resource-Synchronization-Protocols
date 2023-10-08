@@ -15,16 +15,27 @@ Please download the RTEMS from its original release site (https://github.com/RTE
         patch -p1 < RTEMS_patch_resource_protocols.patch
 
 <br />
-# Protocol tests:
+
+# Protocol Tests:
 Test suites for DPCP, MPCP, FMLP, DFLP, and beta version of HDGA.
 
 # PowerPC Deployment:
 We support the deployment of RTEMS on T4240rdb board with powerpc architecture.<br />
-The compilation of RTEMS is based on the guide: [T4240RDB Deployment Guid](https://es-rtos-kh.blogspot.com/2018/10/rtemsqoriq-how-to-deploy-rtems-5-on-nxp.html).<br />
+The compilation of RTEMS is based on the guide: [T4240RDB Deployment Guide](https://es-rtos-kh.blogspot.com/2018/10/rtemsqoriq-how-to-deploy-rtems-5-on-nxp.html).<br />
 The deployment details can be found in 'Deploy to T4240rdb'.<br />
 We also provide the template file of t4240rdb.dtb.<br />
 
 # RTEMS-5 Support:
-We support aforementationed protocols for RTEMS-5 (in folder RTEMS-5). In addition, the implementation for DGA has been formally verified (by Surya Subramanian).
+We support aforementationed protocols for official release of RTEMS-5.1 (in folder RTEMS-5). In addition, the implementation for DGA has been formally verified (by Surya Subramanian).
 <br />
-The detailed deployment for verification can refer to [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS)
+## Protocols Support:
+The patch `RTEMS_file.patch` can be applied to the downloaded RTEMS-5.1 by executing 'patch -p1 < RTEMS_file.patch'.
+<br />
+The compilation of RTEMS based on qemu can refer to [RTEMS Compilation Guide](https://es-rtos-kh.blogspot.com/2020/06/rsbrtems-5-with-qemu-smp.html).
+<br />
+## Formal Verification:
+The detailed deployment for verification can refer to [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS). The detailed steps are as follows:
+1. RTEMS Installation:
+   1. RBS Build:
+      1. git clone git://git.rtems.org/rtems-source-builder.git rsb
+      2. 
