@@ -9,7 +9,7 @@
 #include <rtems/rtems/tasksdata.h>
 
 /*@ ghost
-   extern Thread_Control *g_thread;
+   extern Thread_Control *thread_queue_first_locked;
  */
 /*@
 logic Thread_Control* HDGAMutex_Owner(HDGA_Control *m) =
@@ -55,6 +55,12 @@ RTEMS_INLINE_ROUTINE bool _HDGA_Has_Valid_ticket(
   HDGA_Control   *hdga,
   Thread_Control *executing
 );
+
+/*
+  requires \valid(hdga);
+  assigns hdga->Wait_queue;
+  ensures hdga->Wait_queue == \old(hdga->Wait_queue); // Assuming it releases without any change to the structure itself.
+*/
 //@ assigns \nothing;
 RTEMS_INLINE_ROUTINE void _HDGA_Release(
   HDGA_Control         *hdga,
@@ -83,6 +89,7 @@ RTEMS_INLINE_ROUTINE void _HDGA_Set_owner(
 /*@
   requires \valid(hdga) && \valid(queue_context);
   assigns hdga->Wait_queue.Queue.owner;
+  //ensures hdga->Wait_queue.Queue.owner == executing;
   ensures \result == STATUS_SUCCESSFUL;
 */
 RTEMS_INLINE_ROUTINE Status_Control _HDGA_Claim_ownership(
@@ -107,7 +114,9 @@ RTEMS_INLINE_ROUTINE Status_Control _HDGA_Initialize(
 );
 /*@
   requires \valid(hdga) && \valid(queue_context) ;
-  assigns *queue_context;
+  //assigns *queue_context;
+  assigns queue_context->thread_state, queue_context->deadlock_callout;
+  ensures queue_context->thread_state == STATES_WAITING_FOR_MUTEX;
   ensures \result == STATUS_SUCCESSFUL;
 */
 RTEMS_INLINE_ROUTINE Status_Control _HDGA_Wait_for_ownership(
@@ -118,17 +127,17 @@ RTEMS_INLINE_ROUTINE Status_Control _HDGA_Wait_for_ownership(
 /*@
   requires \valid(hdga) && \valid(executing) && \valid(queue_context) ;
   
-  behavior noOwner:
+  behavior has_valid_ticket_and_no_owner:
    assumes HDGAMutex_Owner(hdga) == NULL && HDGA_has_valid_ticket(hdga, executing);
    assigns hdga->Wait_queue.Queue.owner;
    ensures \result == STATUS_SUCCESSFUL;
-  behavior semaphoreExecuting:
+  behavior owner_is_executing:
    assumes HDGAMutex_Owner(hdga) == executing && HDGAMutex_Owner(hdga) != NULL;
    ensures \result == STATUS_UNAVAILABLE;
-  behavior semaphoreWaitForOwnership:
+  behavior wait_for_ownership:
    assumes HDGAMutex_Owner(hdga) != executing && HDGAMutex_Owner(hdga) != NULL && wait;
    ensures \result == STATUS_SUCCESSFUL;
-  behavior else:
+  behavior no_wait:
    assumes HDGAMutex_Owner(hdga) != executing && HDGAMutex_Owner(hdga) != NULL && !wait;
    ensures \result == STATUS_UNAVAILABLE;
   disjoint behaviors;
@@ -142,13 +151,13 @@ RTEMS_INLINE_ROUTINE Status_Control _HDGA_Seize(
 /*@
   requires \valid(hdga) && \valid(executing)&& \valid(queue_context);
   assigns hdga->Wait_queue.Queue.owner,hdga->current_position;
-  behavior notOwner:
+  behavior is_not_owner:
    assumes HDGAMutex_Owner(hdga) != executing;
    ensures \result == STATUS_NOT_OWNER;
-  behavior surrenderPossible:
+  behavior is_owner:
    assumes HDGAMutex_Owner(hdga)!= NULL && HDGAMutex_Owner(hdga) == executing;
    ensures \result == STATUS_SUCCESSFUL;
-  behavior nowaitingthreads:
+  behavior nowaiting:
    assumes HDGAMutex_Owner(hdga)== NULL && HDGAMutex_Owner(hdga) == executing;
   complete behaviors;
   disjoint behaviors;
@@ -158,29 +167,39 @@ RTEMS_INLINE_ROUTINE Status_Control _HDGA_Surrender(
   Thread_Control       *executing,
   Thread_queue_Context *queue_context
 );
-/*@
+
+/*@ 
   requires \valid(hdga);
   assigns \nothing;
-  ensures HDGAMutex_Owner(hdga)!= NULL || g_thread != NULL==> \result == STATUS_RESOURCE_IN_USE;
-  ensures HDGAMutex_Owner(hdga)== NULL && g_thread == NULL ==> \result == STATUS_SUCCESSFUL;
-*/
-RTEMS_INLINE_ROUTINE Status_Control _HDGA_Can_destroy( HDGA_Control *hdga );
-// ;
-/*@
-  requires \valid(hdga) && \valid(executing) && \valid(queue_context) ;
-  assigns executing->ticket.ticket, hdga->ticket_order[position], executing->ticket.owner  ;
-  ensures \result == STATUS_SUCCESSFUL;
-  ensures (HDGAGetTicketNumber(executing) == 0) ==> executing->ticket.owner == executing;
-  behavior no_ticket_number:
-   assumes HDGAGetTicketNumber(executing) == 0; 
-   assigns executing->ticket.ticket, hdga->ticket_order[position], executing->ticket.owner ;
-  behavior else:
-   assumes executing->ticket.ticket != 0;
-   assigns hdga->ticket_order[position];
-   ensures hdga->ticket_order[position] == executing->ticket.ticket;
-  complete behaviors;
+  behavior resource_in_use:
+    assumes HDGAMutex_Owner(hdga) != NULL || thread_queue_first_locked != NULL;
+    ensures \result == STATUS_RESOURCE_IN_USE;
+  behavior can_destroy:
+    assumes HDGAMutex_Owner(hdga) == NULL && thread_queue_first_locked == NULL;
+    ensures \result == STATUS_SUCCESSFUL;
   disjoint behaviors;
 */
+RTEMS_INLINE_ROUTINE Status_Control _HDGA_Can_destroy( HDGA_Control *hdga );
+
+/*@
+ requires \valid(hdga) && \valid(executing) && \valid(queue_context);
+    assigns hdga->ticket_order[position], executing->ticket.ticket, executing->ticket.owner;
+    ensures \result == STATUS_SUCCESSFUL;
+    behavior initialize_ticket:
+      assumes HDGAGetTicketNumber(executing) == 0;
+      assigns executing->ticket.ticket;
+      assigns hdga->ticket_order[position];
+      assigns executing->ticket.owner;
+      ensures executing->ticket.owner == executing;
+      
+    behavior use_existing_ticket:
+      assumes HDGAGetTicketNumber(executing) != 0;
+      ensures hdga->ticket_order[position] == executing->ticket.ticket;
+      ensures executing->ticket.owner == \old(executing->ticket.owner);
+    
+    disjoint behaviors;
+    complete behaviors;
+ */
 RTEMS_INLINE_ROUTINE Status_Control _HDGA_Set_thread(
   HDGA_Control         *hdga,
   Thread_Control       *executing,
@@ -192,44 +211,19 @@ RTEMS_INLINE_ROUTINE void _HDGA_Destroy(
   HDGA_Control         *hdga,
   Thread_queue_Context *queue_context
 );
-/*
-//@ assigns \nothing;
-static void _Thread_queue_Destroy(Thread_queue_Control *the_thread_queue);
-//@ assigns \nothing;
-void _Thread_queue_Release(Thread_queue_Control *the_thread_queue,
-                           Thread_queue_Context *queue_context);
- //@ assigns \nothing;                          
-static void _Thread_queue_Acquire_critical(Thread_queue_Control *the_thread_queue,
-                                                    Thread_queue_Context *queue_context)     ;    
-             
-  //@ assigns \nothing;  
- static void _Thread_queue_Context_set_thread_state(Thread_queue_Context *queue_context,
-                                                            States_Control thread_state);    
-  //@ assigns \nothing;
-  static void _Thread_queue_Context_set_deadlock_callout(Thread_queue_Context *queue_context,
-                                                                void (*deadlock_callout)
-                                                                (Thread_Control *the_thread));
-  //@ assigns \nothing;
-  void _Thread_queue_Enqueue(Thread_queue_Queue *queue,
-                           Thread_queue_Operations const *operations,
-                           Thread_Control *the_thread,
-                           Thread_queue_Context *queue_context);     
-  
- //@ assigns \nothing; 
-  static void _Thread_queue_Context_clear_priority_updates(Thread_queue_Context *queue_context);    */  
                      
-  //@ assigns \nothing;
-  void _Thread_queue_Object_initialize(Thread_queue_Control *the_thread_queue);   
+//@ assigns \nothing;
+void _Thread_queue_Object_initialize(Thread_queue_Control *the_thread_queue);   
   
-   //@ assigns \nothing;                                                   
- void _Workspace_Free(void *block);               
+//@ assigns \nothing;                                                   
+void _Workspace_Free(void *block);               
  
- //@ assigns \nothing;                         
+//@ assigns \nothing;                         
 void _Thread_queue_Extract_critical(Thread_queue_Queue *queue,
                                     Thread_queue_Operations const *operations,
                                     Thread_Control *the_thread,
                                     Thread_queue_Context *queue_context);  
 /*@ assigns \nothing; 
-  ensures \result == g_thread;*/
+  ensures \result == thread_queue_first_locked;*/
   static Thread_Control *_Thread_queue_First_locked(Thread_queue_Control *the_thread_queue,
-                                                           Thread_queue_Operations const *operations);                                                                                                                                                                                             
+                                                           Thread_queue_Operations const *operations);                                                                                                                                                                                     
