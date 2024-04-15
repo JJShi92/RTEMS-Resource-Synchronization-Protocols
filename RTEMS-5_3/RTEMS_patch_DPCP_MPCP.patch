@@ -1,12 +1,11 @@
 diff --git a/cpukit/Makefile.am b/cpukit/Makefile.am
-index 202cf3c346..0a3dbebce5 100644
+index 202cf3c346..52ddde5b97 100644
 --- a/cpukit/Makefile.am
 +++ b/cpukit/Makefile.am
-@@ -776,6 +776,8 @@ librtemscpu_a_SOURCES += rtems/src/semflush.c
+@@ -776,6 +776,7 @@ librtemscpu_a_SOURCES += rtems/src/semflush.c
  librtemscpu_a_SOURCES += rtems/src/semident.c
  librtemscpu_a_SOURCES += rtems/src/semobtain.c
  librtemscpu_a_SOURCES += rtems/src/semrelease.c
-+librtemscpu_a_SOURCES += rtems/src/semticket.c
 +librtemscpu_a_SOURCES += rtems/src/semsetprocessor.c
  librtemscpu_a_SOURCES += rtems/src/semsetpriority.c
  librtemscpu_a_SOURCES += rtems/src/signalcatch.c
@@ -1383,21 +1382,13 @@ index e7fbb8b166..e8c7afee53 100644
  
  #ifdef __cplusplus
 diff --git a/cpukit/include/rtems/score/threadqimpl.h b/cpukit/include/rtems/score/threadqimpl.h
-index 24a2ba5e60..3283062c58 100644
+index 24a2ba5e60..bacc10bc67 100644
 --- a/cpukit/include/rtems/score/threadqimpl.h
 +++ b/cpukit/include/rtems/score/threadqimpl.h
-@@ -930,6 +930,21 @@ void _Thread_queue_Enqueue(
+@@ -930,6 +930,13 @@ void _Thread_queue_Enqueue(
    Thread_queue_Context          *queue_context
  );
  
-+void _Thread_queue_Enqueue2(
-+  Thread_queue_Queue            *queue,
-+  const Thread_queue_Operations *operations,
-+  Thread_Control                *the_thread,
-+  Thread_queue_Context          *queue_context,
-+  Per_CPU_Control *cpu
-+);
-+
 +void _Thread_queue_Enqueue_busy(
 +  Thread_queue_Queue            *queue,
 +  const Thread_queue_Operations *operations,
@@ -1408,58 +1399,14 @@ index 24a2ba5e60..3283062c58 100644
  #if defined(RTEMS_SMP)
  /**
   * @brief Enqueues the thread on the thread queue and busy waits for dequeue.
-@@ -961,6 +976,15 @@ Status_Control _Thread_queue_Enqueue_sticky(
- );
- #endif
- 
-+#if defined(RTEMS_SMP)
-+Status_Control _Thread_queue_Enqueue_sticky_no_update(
-+  Thread_queue_Queue            *queue,
-+  const Thread_queue_Operations *operations,
-+  Thread_Control                *the_thread,
-+  Thread_queue_Context          *queue_context
-+);
-+#endif
-+
- /**
-  * @brief Extracts the thread from the thread queue, restores the default wait
-  * operations and restores the default thread lock.
-@@ -1112,6 +1136,16 @@ void _Thread_queue_Surrender(
+@@ -1111,7 +1118,6 @@ void _Thread_queue_Surrender(
+   const Thread_queue_Operations *operations
  );
  
- #if defined(RTEMS_SMP)
-+void _Thread_queue_Surrender_and_Migrate(
-+  Thread_queue_Queue            *queue,
-+  Thread_queue_Heads            *heads,
-+  Thread_Control                *previous_owner,
-+  Thread_queue_Context          *queue_context,
-+  const Thread_queue_Operations *operations,
-+  Per_CPU_Control *cpu,
-+  Priority_Node *priority
-+);
-+
+-#if defined(RTEMS_SMP)
  /**
   * @brief Surrenders the thread queue previously owned by the thread to the
   * first enqueued thread.
-@@ -1141,6 +1175,18 @@ void _Thread_queue_Surrender_sticky(
- );
- #endif
- 
-+#if defined(RTEMS_SMP)
-+void _Thread_queue_Surrender_sticky_and_migrate(
-+  Thread_queue_Queue            *queue,
-+  Thread_queue_Heads            *heads,
-+  Thread_Control                *previous_owner,
-+  Thread_queue_Context          *queue_context,
-+  const Thread_queue_Operations *operations,
-+  Per_CPU_Control *cpu,
-+  Priority_Node *priority
-+);
-+#endif
-+
- /**
-  * @brief Checks if the thread queue queue is empty.
-  *
 diff --git a/cpukit/rtems/src/semcreate.c b/cpukit/rtems/src/semcreate.c
 index ea89800685..625b066c1e 100644
 --- a/cpukit/rtems/src/semcreate.c
@@ -1719,10 +1666,10 @@ index 933114f96a..bcfeaf4b86 100644
  #endif
 diff --git a/cpukit/rtems/src/semsetprocessor.c b/cpukit/rtems/src/semsetprocessor.c
 new file mode 100644
-index 0000000000..43046022f1
+index 0000000000..3924ce944b
 --- /dev/null
 +++ b/cpukit/rtems/src/semsetprocessor.c
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,90 @@
 +/**
 + * @file
 + *
@@ -1757,7 +1704,10 @@ index 0000000000..43046022f1
 +  Semaphore_Control   *the_semaphore;
 +  Thread_queue_Context queue_context;
 +  ISR_lock_Context     lock_context;
++  uintptr_t            flags;
++  Semaphore_Variant    variant;
 +  Status_Control       status;
++  
 +
 +  the_semaphore = _Semaphore_Get( id, &queue_context );
 +
@@ -1773,7 +1723,10 @@ index 0000000000..43046022f1
 +    &queue_context,
 +    _Semaphore_Core_mutex_mp_support
 +  );
-+  switch ( the_semaphore->variant ) {
++  flags = _Semaphore_Get_flags( the_semaphore );
++  variant = _Semaphore_Get_variant( flags );
++
++  switch ( variant ) {
 +    case SEMAPHORE_VARIANT_MUTEX_INHERIT_PRIORITY:
 +      status =  RTEMS_NOT_DEFINED;
 +      break;
@@ -1800,7 +1753,7 @@ index 0000000000..43046022f1
 +     break;
 +#endif
 +    default:
-+      _Assert( the_semaphore->variant == SEMAPHORE_VARIANT_COUNTING );
++      _Assert(variant == SEMAPHORE_VARIANT_COUNTING );
 +      status = RTEMS_NOT_DEFINED;
 +      break;
 +  }
@@ -1808,7 +1761,7 @@ index 0000000000..43046022f1
 +  return _Status_Get( status );
 +}
 diff --git a/cpukit/score/src/threadqenqueue.c b/cpukit/score/src/threadqenqueue.c
-index 972736f3f2..0e87705706 100644
+index 972736f3f2..ea3356e7b2 100644
 --- a/cpukit/score/src/threadqenqueue.c
 +++ b/cpukit/score/src/threadqenqueue.c
 @@ -26,6 +26,7 @@
@@ -1819,87 +1772,10 @@ index 972736f3f2..0e87705706 100644
  #include <rtems/score/watchdogimpl.h>
  
  #define THREAD_QUEUE_INTEND_TO_BLOCK \
-@@ -452,6 +453,140 @@ void _Thread_queue_Enqueue(
+@@ -452,6 +453,63 @@ void _Thread_queue_Enqueue(
    _Thread_Dispatch_direct( cpu_self );
  }
  
-+void _Thread_queue_Enqueue2(
-+  Thread_queue_Queue            *queue,
-+  const Thread_queue_Operations *operations,
-+  Thread_Control                *the_thread,
-+  Thread_queue_Context          *queue_context,
-+  Per_CPU_Control *cpu
-+)
-+{
-+  Per_CPU_Control *cpu_self;
-+  bool             success;
-+
-+  cpu_self = cpu;
-+  _Assert( queue_context->enqueue_callout != NULL );
-+
-+#if defined(RTEMS_MULTIPROCESSING)
-+  if ( _Thread_MP_Is_receive( the_thread ) && the_thread->receive_packet ) {
-+    the_thread = _Thread_MP_Allocate_proxy( queue_context->thread_state );
-+  }
-+#endif
-+
-+  _Thread_Wait_claim( the_thread, queue );
-+
-+  if ( !_Thread_queue_Path_acquire_critical( queue, the_thread, queue_context ) ) {
-+    _Thread_queue_Path_release_critical( queue_context );
-+    _Thread_Wait_restore_default( the_thread );
-+    _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
-+    _Thread_Wait_tranquilize( the_thread );
-+    _Assert( queue_context->deadlock_callout != NULL );
-+    ( *queue_context->deadlock_callout )( the_thread );
-+    _Thread_Dispatch_enable( cpu_self );
-+    return;
-+  }
-+
-+  _Thread_queue_Context_clear_priority_updates( queue_context );
-+  _Thread_Wait_claim_finalize( the_thread, operations );
-+  ( *operations->enqueue )( queue, the_thread, queue_context );
-+
-+  _Thread_queue_Path_release_critical( queue_context );
-+
-+  the_thread->Wait.return_code = STATUS_SUCCESSFUL;
-+  _Thread_Wait_flags_set( the_thread, THREAD_QUEUE_INTEND_TO_BLOCK );
-+  _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
-+
-+  ( *queue_context->enqueue_callout )(
-+    queue,
-+    the_thread,
-+    cpu_self,
-+    queue_context
-+  );
-+
-+  /*
-+   *  Set the blocking state for this thread queue in the thread.
-+   */
-+  _Thread_Set_state( the_thread, queue_context->thread_state );
-+
-+  /*
-+   * At this point thread dispatching is disabled, however, we already released
-+   * the thread queue lock.  Thus, interrupts or threads on other processors
-+   * may already changed our state with respect to the thread queue object.
-+   * The request could be satisfied or timed out.  This situation is indicated
-+   * by the thread wait flags.  Other parties must not modify our thread state
-+   * as long as we are in the THREAD_QUEUE_INTEND_TO_BLOCK thread wait state,
-+   * thus we have to cancel the blocking operation ourself if necessary.
-+   */
-+  success = _Thread_Wait_flags_try_change_acquire(
-+    the_thread,
-+    THREAD_QUEUE_INTEND_TO_BLOCK,
-+    THREAD_QUEUE_BLOCKED
-+  );
-+  if ( !success ) {
-+    _Thread_Remove_timer_and_unblock( the_thread, queue );
-+  }
-+
-+  _Thread_Priority_update( queue_context );
-+  _Thread_Dispatch_direct( cpu_self );
-+}
-+
 +void _Thread_queue_Enqueue_busy(
 +  Thread_queue_Queue            *queue,
 +  const Thread_queue_Operations *operations,
@@ -1960,181 +1836,6 @@ index 972736f3f2..0e87705706 100644
  #if defined(RTEMS_SMP)
  Status_Control _Thread_queue_Enqueue_sticky(
    Thread_queue_Queue            *queue,
-@@ -515,6 +650,67 @@ Status_Control _Thread_queue_Enqueue_sticky(
- }
- #endif
- 
-+#if defined(RTEMS_SMP)
-+Status_Control _Thread_queue_Enqueue_sticky_no_update(
-+  Thread_queue_Queue            *queue,
-+  const Thread_queue_Operations *operations,
-+  Thread_Control                *the_thread,
-+  Thread_queue_Context          *queue_context
-+)
-+{
-+  Per_CPU_Control *cpu_self;
-+
-+  _Assert( queue_context->enqueue_callout != NULL );
-+
-+  _Thread_Wait_claim( the_thread, queue );
-+
-+  if ( !_Thread_queue_Path_acquire_critical( queue, the_thread, queue_context ) ) {
-+    _Thread_queue_Path_release_critical( queue_context );
-+    _Thread_Wait_restore_default( the_thread );
-+    _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
-+    _Thread_Wait_tranquilize( the_thread );
-+    ( *queue_context->deadlock_callout )( the_thread );
-+    return _Thread_Wait_get_status( the_thread );
-+  }
-+
-+  _Thread_queue_Context_clear_priority_updates( queue_context );
-+  _Thread_Wait_claim_finalize( the_thread, operations );
-+  ( *operations->enqueue )( queue, the_thread, queue_context );
-+
-+  _Thread_queue_Path_release_critical( queue_context );
-+
-+  the_thread->Wait.return_code = STATUS_SUCCESSFUL;
-+  _Thread_Wait_flags_set( the_thread, THREAD_QUEUE_INTEND_TO_BLOCK );
-+  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
-+  _Thread_queue_Queue_release( queue, &queue_context->Lock_context.Lock_context );
-+
-+  if ( cpu_self->thread_dispatch_disable_level != 1 ) {
-+    _Internal_error(
-+      INTERNAL_ERROR_THREAD_QUEUE_ENQUEUE_STICKY_FROM_BAD_STATE
-+    );
-+  }
-+
-+  ( *queue_context->enqueue_callout )(
-+    queue,
-+    the_thread,
-+    cpu_self,
-+    queue_context
-+  );
-+
-+  _Thread_Dispatch_enable( cpu_self );
-+
-+  while (
-+    _Thread_Wait_flags_get_acquire( the_thread ) == THREAD_QUEUE_INTEND_TO_BLOCK
-+  ) {
-+    /* Wait */
-+  }
-+
-+  _Thread_Wait_tranquilize( the_thread );
-+  _Thread_Timer_remove( the_thread );
-+  return _Thread_Wait_get_status( the_thread );
-+}
-+#endif
-+
- #if defined(RTEMS_MULTIPROCESSING)
- static bool _Thread_queue_MP_set_callout(
-   Thread_Control             *the_thread,
-@@ -704,6 +900,55 @@ void _Thread_queue_Surrender(
-   _Thread_Dispatch_enable( cpu_self );
- }
- 
-+void _Thread_queue_Surrender_and_Migrate(
-+  Thread_queue_Queue            *queue,
-+  Thread_queue_Heads            *heads,
-+  Thread_Control                *previous_owner,
-+  Thread_queue_Context          *queue_context,
-+  const Thread_queue_Operations *operations,
-+  Per_CPU_Control *cpu,
-+  Priority_Node *priority
-+)
-+{
-+  Thread_Control  *new_owner;
-+  bool             unblock;
-+  Per_CPU_Control *cpu_self;
-+  ISR_lock_Context lock_context;
-+
-+  _Assert( heads != NULL );
-+
-+  _Thread_queue_Context_clear_priority_updates( queue_context );
-+  new_owner = ( *operations->surrender )(
-+    queue,
-+    heads,
-+    previous_owner,
-+    queue_context
-+  );
-+  queue->owner = new_owner;
-+
-+#if defined(RTEMS_MULTIPROCESSING)
-+  if ( !_Thread_queue_MP_set_callout( new_owner, queue_context ) )
-+#endif
-+  {
-+    _Thread_Resource_count_increment( new_owner );
-+  }
-+
-+  unblock = _Thread_queue_Make_ready_again( new_owner );
-+
-+  _Thread_queue_Queue_release(
-+    queue,
-+    &queue_context->Lock_context.Lock_context
-+  );
-+
-+  if ( unblock ) {
-+    _Thread_Remove_timer_and_unblock( new_owner, queue );
-+  }
-+  _Thread_Wait_acquire_default_critical( new_owner, &lock_context );
-+  _Scheduler_Migrate_To(new_owner, cpu, priority);
-+
-+  _Thread_Wait_release_default_critical( new_owner, &lock_context );
-+}
-+
- #if defined(RTEMS_SMP)
- void _Thread_queue_Surrender_sticky(
-   Thread_queue_Queue            *queue,
-@@ -728,6 +973,50 @@ void _Thread_queue_Surrender_sticky(
-   queue->owner = new_owner;
-   _Thread_queue_Make_ready_again( new_owner );
- 
-+  cpu_self = _Thread_queue_Dispatch_disable( queue_context );
-+  _Thread_queue_Queue_release(
-+    queue,
-+    &queue_context->Lock_context.Lock_context
-+  );
-+
-+  _Thread_Wait_acquire_default_critical( new_owner, &lock_context );
-+  _Scheduler_Migrate_To(new_owner, cpu, priority);
-+  _Thread_Wait_release_default_critical( new_owner, &lock_context );
-+
-+  _Thread_Priority_and_sticky_update( previous_owner, -1 );
-+  _Thread_Priority_and_sticky_update( new_owner, 0 );
-+
-+  _Thread_Dispatch_enable( cpu_self );
-+}
-+#endif
-+
-+#if defined(RTEMS_SMP)
-+void _Thread_queue_Surrender_sticky_and_migrate(
-+  Thread_queue_Queue            *queue,
-+  Thread_queue_Heads            *heads,
-+  Thread_Control                *previous_owner,
-+  Thread_queue_Context          *queue_context,
-+  const Thread_queue_Operations *operations,
-+  Per_CPU_Control *cpu,
-+  Priority_Node *priority
-+)
-+{
-+  Thread_Control  *new_owner;
-+  Per_CPU_Control *cpu_self;
-+  ISR_lock_Context lock_context;
-+
-+  _Assert( heads != NULL );
-+
-+  _Thread_queue_Context_clear_priority_updates( queue_context );
-+  new_owner = ( *operations->surrender )(
-+    queue,
-+    heads,
-+    previous_owner,
-+    queue_context
-+  );
-+  queue->owner = new_owner;
-+  _Thread_queue_Make_ready_again( new_owner );
-+
-   cpu_self = _Thread_queue_Dispatch_disable( queue_context );
-   _Thread_queue_Queue_release(
-     queue,
 diff --git a/cpukit/score/src/threadqops.c b/cpukit/score/src/threadqops.c
 index 8c3e0cb1dc..87171874e6 100644
 --- a/cpukit/score/src/threadqops.c
