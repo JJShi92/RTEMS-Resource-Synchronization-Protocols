@@ -104,7 +104,7 @@ rtems_task Test_task_2(
 
   /* Lock SEM1 */
   status = rtems_semaphore_obtain(Semaphore1, RTEMS_WAIT, 0);
-  printf("TA2 obtaining SEM1\n");
+  printf("TAS2 obtaining SEM1\n");
   assert(status==0);
 
   wait(100);
@@ -128,7 +128,7 @@ rtems_task Test_task_2(
   status = rtems_task_start(id, Test_task_1, 0);
   assert(status==0);
   
-  /* Release Semaphore allowing TA1 to continue */
+  /* Release Semaphore allowing TAS1 to continue */
   status = rtems_semaphore_release(Semaphore1);\
   printf("TAS2 releasing SEM1\n");
   assert(status==0);
@@ -139,7 +139,7 @@ rtems_task Test_task_2(
   printf("TAS2 running on CPU %" PRIu32 "\n", cpu);
   assert(cpu==0);
 
-  /* wait until TA1 is suspended. Should not block TA1 due to TA1 having higher priority. */
+  /* wait until TAS1 is suspended. Should not block TAS1 due to TAS1 having higher priority. */
   while(rtems_task_is_suspended(id) == RTEMS_SUCCESSFUL) {continue;}
   printf("End of TAS2.\n");
   rtems_task_suspend(RTEMS_SELF);

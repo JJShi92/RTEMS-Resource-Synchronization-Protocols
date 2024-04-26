@@ -17,7 +17,7 @@ rtems_task Test_task_3(
     uint32_t cpu_return;
     rtems_status_code status;
     rtems_id task_2_id;
-    
+
     printf("Starting TAS3: \n");
 
     /* Print that task is running and the cpu number */
@@ -27,7 +27,7 @@ rtems_task Test_task_3(
 
     /* lock semaphore */
     status = rtems_semaphore_obtain(Semaphore2, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    printf("TA3 obtaining SEM2\n");
+    printf("TAS3 obtaining SEM2\n");
     assert(status==0);
     wait(100);
 
@@ -36,16 +36,31 @@ rtems_task Test_task_3(
     printf("TAS3 running on CPU %" PRIu32 "\n", cpu_synchronization);
     if(cpu_application == cpu_synchronization)
     {
-        printf("TA3 failed to migrate to synchronization CPU. Test failed.\n");
+        printf("TAS3 failed to migrate to synchronization CPU. Test failed.\n");
         exit(1);
     }
 
-    /* Continue running until TA2 is suspended */
+    /* Wait until TA2 is suspended */
     status = rtems_task_ident(rtems_build_name( 'T', 'A', 'S', '2' ), RTEMS_SEARCH_ALL_NODES, &task_2_id);
     assert(status==0);
     while(rtems_task_is_suspended(task_2_id) == RTEMS_SUCCESSFUL) {continue;}
-    printf("End of TAS3.\n");
 
-    /* TA3 is last task so call exit. */
+    /* Release semaphore */
+    status = rtems_semaphore_release(Semaphore2);
+    printf("TAS3 releasing SEM2\n");
+    assert(status==0);
+    wait(100);
+
+    /* Ensure that task returns to original application processor */
+    cpu_return = rtems_scheduler_get_processor();
+    printf("TAS3 running on CPU %" PRIu32 "\n", cpu_return);
+    if(cpu_return != cpu_application)
+    {
+        printf("TAS3 failed to migrate from synchronization CPU. Test failed.\n");
+        exit(1);
+    }
+
+    printf("End of TAS3.\n");
+    /* TAS3 is last task so call exit. */
     exit(0);
 }

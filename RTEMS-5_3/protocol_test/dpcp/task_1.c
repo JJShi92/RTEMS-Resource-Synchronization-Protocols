@@ -27,7 +27,7 @@ rtems_task Test_task_1(
 
     /* lock semaphore */
     status = rtems_semaphore_obtain(Semaphore1, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    printf("TA1 obtaining SEM1\n");
+    printf("TAS1 obtaining SEM1\n");
     assert(status==0);
     wait(300);
 
@@ -36,7 +36,7 @@ rtems_task Test_task_1(
     printf("TAS1 running on CPU %" PRIu32 "\n", cpu_synchronization);
     if(cpu_application == cpu_synchronization)
     {
-        printf("TA1 failed to migrate to synchronization CPU. Test failed.\n");
+        printf("TAS1 failed to migrate to synchronization CPU. Test failed.\n");
         exit(1);
     }
 
@@ -51,7 +51,7 @@ rtems_task Test_task_1(
     printf("TAS1 running on CPU %" PRIu32 "\n", cpu_return);
     if(cpu_return != cpu_application)
     {
-        printf("TA1 failed to migrate from synchronization CPU. Test failed.\n");
+        printf("TAS1 failed to migrate from synchronization CPU. Test failed.\n");
         exit(1);
     }
 
