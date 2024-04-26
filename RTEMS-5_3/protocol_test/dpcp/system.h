@@ -1,27 +1,37 @@
 #include <bsp.h>
 
-/* functions */
+/* Task functions numbered according to relative priority*/
 
-rtems_task Init(
+rtems_task Test_task_1(
   rtems_task_argument argument
 );
 
-rtems_task Test_task(
+rtems_task Test_task_2(
   rtems_task_argument argument
 );
+
+rtems_task Test_task_3(
+  rtems_task_argument argument
+);
+
+void wait(int ticks);
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_PROCESSORS 3
 #define CONFIGURE_MAXIMUM_PRIORITY 255
 
-#define CONFIGURE_MAXIMUM_TASKS 2
-#define CONFIGURE_MAXIMUM_SEMAPHORES 1
+#define CONFIGURE_MAXIMUM_TASKS 3
+#define CONFIGURE_MAXIMUM_SEMAPHORES 2
+
+#define CONFIGURE_INIT_TASK_PRIORITY 10
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+#define CONFIGURE_INIT_TASK_NAME rtems_build_name( 'T', 'A', 'S', '2' )
+#define CONFIGURE_INIT_TASK_ENTRY_POINT Test_task_2
 
 /* Configuration Step 1 - Scheduler Algorithms */
 #define CONFIGURE_SCHEDULER_PRIORITY_SMP
@@ -48,4 +58,5 @@ RTEMS_SCHEDULER_PRIORITY_SMP(sync, CONFIGURE_MAXIMUM_PRIORITY + 1);
 
 /* global variables */
 
-rtems_id Semaphore; /* synchronisation semaphore */ 
+rtems_id Semaphore1; /* synchronisation semaphore SEM1 */ 
+rtems_id Semaphore2; /* synchronisation semaphore SEM2 */ 

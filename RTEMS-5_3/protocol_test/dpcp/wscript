@@ -30,5 +30,4 @@ def build(bld):
     bld(features = 'c cprogram',
         target = 'dpcp.exe',
         cflags = '-g -O2',
-        source = ['init.c',
-                  'task.c'])
+        source = ['task_1.c', 'task_2.c', 'task_3.c'])
