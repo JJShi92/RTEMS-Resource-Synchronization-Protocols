@@ -70,10 +70,6 @@ rtems_task Test_task_2(
     2, //Priority 2
     &Semaphore2);;
   assert(status==0);
-  status = rtems_semaphore_set_processor(Semaphore1, 2);
-  assert(status==0);
-  status = rtems_semaphore_set_processor(Semaphore2, 2);
-  assert(status==0);
 
   /* Create and start TAS3 on APP1 scheduler. */
   status = rtems_task_create(

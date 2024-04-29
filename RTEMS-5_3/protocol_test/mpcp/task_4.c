@@ -61,6 +61,7 @@ rtems_task Test_task_4(
     assert(status==0);
     while(rtems_task_is_suspended(id) == RTEMS_SUCCESSFUL) {continue;}
 
+    /* End of TAS4. TAS4 is last task so exit */
     printf("End of TAS4\n");
-    rtems_task_suspend(RTEMS_SELF);
+    exit(0);
 }
