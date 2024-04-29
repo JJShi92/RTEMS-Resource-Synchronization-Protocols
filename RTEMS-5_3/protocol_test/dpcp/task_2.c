@@ -78,7 +78,7 @@ rtems_task Test_task_2(
     1,                                             
     RTEMS_BINARY_SEMAPHORE | RTEMS_DISTRIBUTED_PRIORITY_CEILING | RTEMS_GLOBAL,
     2, //Priority 2
-    &Semaphore2);;
+    &Semaphore2);
   assert(status==0);
   status = rtems_semaphore_set_processor(Semaphore1, 2);
   assert(status==0);
@@ -129,7 +129,7 @@ rtems_task Test_task_2(
   assert(status==0);
   
   /* Release Semaphore allowing TAS1 to continue */
-  status = rtems_semaphore_release(Semaphore1);\
+  status = rtems_semaphore_release(Semaphore1);
   printf("TAS2 releasing SEM1\n");
   assert(status==0);
   wait(100);

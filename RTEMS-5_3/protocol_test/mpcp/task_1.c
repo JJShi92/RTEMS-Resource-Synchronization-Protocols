@@ -13,14 +13,14 @@ rtems_task Test_task_1(
     rtems_task_argument arg
 )  
 {
-    uint32_t cpu
+    uint32_t cpu;
     rtems_status_code status;
 
     printf("Starting TAS1: \n");
 
     /* Print that task is running and the cpu number */
     cpu = rtems_scheduler_get_processor();
-    printf("TAS1 running on CPU %" PRIu32 "\n", cpu_application);
+    printf("TAS1 running on CPU %" PRIu32 "\n", cpu);
     assert(cpu==1);
 
     /* lock semaphore */

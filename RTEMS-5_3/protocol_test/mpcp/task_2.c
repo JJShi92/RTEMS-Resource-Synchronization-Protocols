@@ -123,7 +123,7 @@ rtems_task Test_task_2(
   wait(100);
 
   /* Suspend to allow TAS3 to run and aquire SEM2 */
-  printf("TAS2 suspending\n")
+  printf("TAS2 suspending\n");
   status = rtems_task_suspend(RTEMS_SELF); 
   assert(status==0);
 
