@@ -18,11 +18,11 @@ TAS3 obtaining SEM2
 TAS1 releasing SEM1
 End of TAS1
 TAS4 obtaining SEM1
+TAS3 releasing SEM2
 Resuming TAS2
 TAS2 obtaining SEM2
 TAS4 releasing SEM1
 TAS2 releasing SEM2
 End of TAS2.
-TAS3 releasing SEM2
 End of TAS3
 End of TAS4

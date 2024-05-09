@@ -42,8 +42,8 @@ rtems_task Test_task_3(
     while(rtems_task_is_suspended(id) == RTEMS_SUCCESSFUL) {continue;}
 
     /* Release semaphore */
-    status = rtems_semaphore_release(Semaphore2);
     printf("TAS3 releasing SEM2\n");
+    status = rtems_semaphore_release(Semaphore2);
     assert(status==0);
     wait(100);
 
