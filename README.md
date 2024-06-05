@@ -98,3 +98,6 @@ then apply the patch from the `RTEMS-5_3` folder:
 
 ## Test suites:
 Test suites for DPCP and MPCP on RTEMS-5.3 can be found in `protocol_test` inside the `RTEMS-5_3` folder. 
+
+## Formal Verification:
+Verifications are provided for both DPCP and MPCP in the `RTEMS-5_3/verifications` directory.  

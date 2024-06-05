@@ -28,7 +28,7 @@
 /*@
   requires \valid(executing) && \valid(dpcp->cpu) && \valid(&dpcp->Ceiling_priority) && \valid(g_homenode);
   requires \separated(executing, dpcp);
-  assigns executing->Scheduler.cpu, g_homenode->Wait.Priority.Node.priority, g_thread_inherited, g_prio, prioritiesUpdated;
+  assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   ensures DPCP_CPU(executing) == dpcp->cpu;
   ensures Executing_Priority == DPCP_Ceiling(dpcp);
   ensures prioritiesUpdated;
@@ -42,7 +42,7 @@ RTEMS_INLINE_ROUTINE void _DPCP_Migrate(
 
 /*@
   requires \valid(executing) && \valid(migration_cpu) && \valid(ceiling_priority) && \valid(g_homenode);
-  assigns executing->Scheduler.cpu, g_homenode->Wait.Priority.Node.priority, g_thread_inherited, g_prio, prioritiesUpdated;
+  assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   ensures DPCP_CPU(executing) == migration_cpu;
   ensures Executing_Priority == ceiling_priority->priority;
   ensures g_thread_inherited == executing && g_prio == ceiling_priority->priority;
@@ -57,7 +57,7 @@ RTEMS_INLINE_ROUTINE void _Scheduler_Migrate_To(
 /*@
   requires \valid(executing) && \valid(dpcp->cpu) && \valid(g_homenode);
   requires \separated(executing, dpcp);
-  assigns executing->Scheduler.cpu, g_homenode->Wait.Priority.Node.priority, g_thread_revoked, g_prio, prioritiesUpdated;
+  assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   ensures DPCP_CPU(executing) == DPCP_CPU(g_thread_revoked);
   ensures g_thread_revoked == executing;
   ensures g_prio == executing->Real_priority.priority;
@@ -69,7 +69,7 @@ RTEMS_INLINE_ROUTINE void _DPCP_Migrate_Back(
 
 /*@
   requires \valid(executing) && \valid(migration_cpu) && \valid(g_homenode);
-  assigns executing->Scheduler.cpu, g_homenode->Wait.Priority.Node.priority, g_thread_revoked, g_prio, prioritiesUpdated;
+  assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   ensures DPCP_CPU(executing) == DPCP_CPU(g_thread_revoked);
   ensures Executing_Priority == executing->Real_priority.priority;
   ensures g_thread_revoked == executing && g_prio == Executing_Priority;
@@ -94,7 +94,7 @@ RTEMS_INLINE_ROUTINE void _DPCP_Release(
 
 /*@
   requires \valid(dpcp);
-  assigns \nothing;
+  assigns \result \from dpcp;
   ensures \result == DPCP_Owner(dpcp) == dpcp->Wait_queue.Queue.owner;
 */
 RTEMS_INLINE_ROUTINE Thread_Control *_DPCP_Get_owner(
@@ -103,7 +103,7 @@ RTEMS_INLINE_ROUTINE Thread_Control *_DPCP_Get_owner(
 
 /*@
   requires \valid(dpcp);
-  assigns dpcp->Wait_queue.Queue.owner;
+  assigns dpcp->Wait_queue.Queue.owner \from owner;
   ensures DPCP_Owner(dpcp) == owner;
 */
 RTEMS_INLINE_ROUTINE void _DPCP_Set_owner(
@@ -142,10 +142,12 @@ RTEMS_INLINE_ROUTINE void _DPCP_Set_priority(
     ensures Executing_Priority <= \old(Executing_Priority);
     ensures PriorityInherited(executing, DPCP_Ceiling(dpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns dpcp->Wait_queue.Queue.owner, g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior raise_fail:
     assumes Executing_Priority < DPCP_Ceiling(dpcp);
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */
@@ -166,10 +168,12 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Claim_ownership(
     ensures Executing_Priority <= \old(Executing_Priority);
     ensures PriorityInherited(executing, DPCP_Ceiling(dpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns dpcp->Wait_queue.Queue.owner, g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior raise_fail:
     assumes Executing_Priority < DPCP_Ceiling(dpcp);
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */
@@ -191,6 +195,7 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Wait_for_ownership(
     ensures Executing_Priority <= \old(Executing_Priority);
     ensures PriorityInherited(executing, DPCP_Ceiling(dpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior seize_wait:
     assumes DPCP_Owner(dpcp) != NULL
       && DPCP_Owner(dpcp) != executing
@@ -202,6 +207,7 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Wait_for_ownership(
     ensures Executing_Priority <= \old(Executing_Priority);
     ensures PriorityInherited(executing, DPCP_Ceiling(dpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior seize_no_wait_not_free:
     assumes DPCP_Owner(dpcp) != NULL
       && DPCP_Owner(dpcp) != executing
@@ -209,15 +215,18 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Wait_for_ownership(
       && !wait;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
     ensures \result == STATUS_UNAVAILABLE;
+    assigns \nothing;
   behavior seize_fail_selfowned:
     assumes DPCP_Owner(dpcp) == executing;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
     ensures \result == STATUS_UNAVAILABLE;
+    assigns \nothing;
   behavior seize_fail_ceiling:
     assumes Executing_Priority < DPCP_Ceiling(dpcp)
       && DPCP_Owner(dpcp) != executing;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED || STATUS_UNAVAILABLE;
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */  
@@ -239,6 +248,7 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Seize(
     ensures Executing_Priority >= \old(Executing_Priority);
     ensures DPCP_CPU(executing) == DPCP_CPU(g_thread_inherited);
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior surrender_successor:
     assumes DPCP_Owner(dpcp) == executing;
     assumes DPCPThreadsWaiting(dpcp);
@@ -247,10 +257,12 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Seize(
     ensures DPCP_Owner(dpcp) == executing;
     ensures DPCP_CPU(executing) == dpcp->cpu;
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, prioritiesUpdated;
   behavior surrender_fail:
     assumes DPCP_Owner(dpcp) != executing;
     ensures DPCP_Owner(dpcp) == \old(DPCP_Owner(dpcp));
     ensures \result == STATUS_NOT_OWNER;
+    assigns \nothing;
   disjoint behaviors;
   complete behaviors;
 */
@@ -270,7 +282,7 @@ RTEMS_INLINE_ROUTINE Status_Control _DPCP_Can_destroy(
 
 /*@
   requires \valid(aggregation);
-  assigns \nothing;
+  assigns \result \from aggregation;
   ensures \result == aggregation->Node.priority == Executing_Priority;
 */
 RTEMS_INLINE_ROUTINE Priority_Control _Priority_Get_priority(
@@ -279,7 +291,7 @@ RTEMS_INLINE_ROUTINE Priority_Control _Priority_Get_priority(
 
 /*@
   requires \valid(the_thread);
-  assigns \nothing;
+  assigns \result \from the_thread;
   ensures \result == g_homenode;
 */
 RTEMS_INLINE_ROUTINE Scheduler_Node *_Thread_Scheduler_get_home_node(
@@ -288,7 +300,8 @@ RTEMS_INLINE_ROUTINE Scheduler_Node *_Thread_Scheduler_get_home_node(
 
 /*@
   requires \valid(queue) && \valid(the_thread) && \valid(operations) && \valid(queue_context);
-  assigns queue->owner, prioritiesUpdated;
+  assigns queue->owner \from the_thread;
+  assigns prioritiesUpdated;
   ensures queue->owner == the_thread;
   ensures prioritiesUpdated;
 */
@@ -299,13 +312,21 @@ void _Thread_queue_Enqueue(
   Thread_queue_Context *queue_context
 );
 
-//@ assigns \nothing;
+/*@
+  requires \valid(queue_context);
+  assigns queue_context->deadlock_callout;
+  ensures queue_context->deadlock_callout == deadlock_callout;
+*/
 RTEMS_INLINE_ROUTINE void _Thread_queue_Context_set_deadlock_callout(
   Thread_queue_Context          *queue_context,
   Thread_queue_Deadlock_callout  deadlock_callout
 );
 
-//@ assigns \nothing;
+/*@
+  requires \valid(queue_context);
+  assigns queue_context->Priority.update_count;
+  ensures queue_context->Priority.update_count == 0;
+*/
 RTEMS_INLINE_ROUTINE void _Thread_queue_Context_clear_priority_updates(
   Thread_queue_Context *queue_context
 );
@@ -322,13 +343,13 @@ RTEMS_INLINE_ROUTINE void _Thread_Wait_release_default_critical(
   ISR_lock_Context *lock_context
 );
 
-//@ assigns \nothing;
+//@ assigns \result \from queue_context;
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_queue_Dispatch_disable(
   Thread_queue_Context *queue_context
 );
 
 /*@ 
-  assigns \nothing;
+  assigns \result \from lock_context;
   ensures \result == DPCP_CPU(g_thread_inherited);
 */
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_Dispatch_disable_critical(
@@ -358,6 +379,7 @@ void _Thread_queue_Extract_critical(
 
 /*@
   requires \valid(the_thread_queue) && \valid(operations);
+  assigns \result \from the_thread_queue;
   behavior successor:
     assumes the_thread_queue->Queue.heads != NULL;
     ensures \result == g_new_owner;

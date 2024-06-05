@@ -42,7 +42,7 @@ RTEMS_INLINE_ROUTINE void _MPCP_Release(
 );
 
 /*@
-  assigns \nothing;
+  assigns \result \from mpcp;
   ensures \result == MPCP_Owner(mpcp);
 */
 RTEMS_INLINE_ROUTINE Thread_Control *_MPCP_Get_owner(
@@ -51,7 +51,7 @@ RTEMS_INLINE_ROUTINE Thread_Control *_MPCP_Get_owner(
 
 /*@
   requires \valid(mpcp);
-  assigns mpcp->Wait_queue.Queue.owner;
+  assigns mpcp->Wait_queue.Queue.owner \from owner;
   ensures MPCP_Owner(mpcp) == owner;
 */
 RTEMS_INLINE_ROUTINE void _MPCP_Set_owner(
@@ -83,7 +83,7 @@ RTEMS_INLINE_ROUTINE Priority_Control _MPCP_Get_priority(
     ensures g_thread_inherited == thread;
     ensures g_prio == MPCP_Localceiling(mpcp);
     ensures \result == STATUS_SUCCESSFUL;
-    assigns g_homenode->Wait.Priority.Node.priority, g_thread_inherited, g_prio, priority_node->priority, queue_context->Priority.update_count;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, priority_node->priority, queue_context->Priority.update_count;
   behavior raise_fail:
     assumes MPCP_Localceiling(mpcp) > Executing_Priority;
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED;
@@ -101,7 +101,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Raise_priority(
 
 /*@
   requires \valid(thread) && \valid(priority_node) && \valid(queue_context) && \valid(g_homenode);
-  assigns g_thread_revoked, g_prio, queue_context->Priority.update_count, g_homenode->Wait.Priority.Node.priority;
+  assigns g_prio, queue_context->Priority.update_count, g_homenode->Wait.Priority.Node.priority;
   ensures g_thread_revoked == thread && g_prio == priority_node->priority;
   ensures Executing_Priority >= \old(Executing_Priority);
 */
@@ -114,6 +114,7 @@ RTEMS_INLINE_ROUTINE void _MPCP_Remove_priority(
 /*@
   requires \valid(mpcp) && \valid(thread) && \valid(ceiling_priority) && \valid(&mpcp->Ceiling_priority);
   ensures MPCP_Ceiling(mpcp) == Executing_Priority;
+  assigns g_homenode->Wait.Priority.Node.priority;
 */
 RTEMS_INLINE_ROUTINE void _MPCP_Replace_priority(
         MPCP_Control   *mpcp,
@@ -133,10 +134,12 @@ RTEMS_INLINE_ROUTINE void _MPCP_Replace_priority(
     ensures MPCP_Ceiling(mpcp) == MPCP_Localceiling(mpcp);
     ensures PriorityInherited(executing, MPCP_Ceiling(mpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior claim_fail:
     assumes MPCP_Localceiling(mpcp) > Executing_Priority;
     ensures MPCP_Owner(mpcp) == \old(MPCP_Owner(mpcp));
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED;
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */
@@ -149,7 +152,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Claim_ownership(
 /*@
   requires \valid(mpcp) && \valid(executing) && \valid(queue_context) && \valid(g_homesched) && \valid(g_homenode) && \valid(&mpcp->Wait_queue.Queue) && \valid(MPCP_TQ_OPERATIONS);
   requires \valid_read(&mpcp->ceiling_priorities[0 .. g_core-1]);
-  requires \separated(mpcp, executing, queue_context, g_homesched, g_homenode);
+  requires \separated(mpcp, executing, queue_context, g_homesched, g_homenode, MPCP_TQ_OPERATIONS);
   behavior claim_success:
     assumes MPCP_Localceiling(mpcp) <= Executing_Priority;
     ensures Executing_Priority == MPCP_Localceiling(mpcp);
@@ -158,10 +161,12 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Claim_ownership(
     ensures MPCP_Ceiling(mpcp) == MPCP_Localceiling(mpcp);
     ensures PriorityInherited(executing, MPCP_Ceiling(mpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior claim_fail:
     assumes MPCP_Localceiling(mpcp) > Executing_Priority;
     ensures MPCP_Owner(mpcp) == \old(MPCP_Owner(mpcp));
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED;
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */
@@ -175,7 +180,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Wait_for_ownership(
   requires \valid(mpcp) && \valid(executing) && \valid(g_homesched) && \valid(g_homenode) && \valid(queue_context) && \valid(MPCP_TQ_OPERATIONS);
   requires \valid_read(&mpcp->ceiling_priorities[0 .. g_core-1]);
   requires executing != NULL;
-  requires \separated(mpcp, executing, queue_context, g_homenode);
+  requires \separated(mpcp, executing, queue_context, g_homenode, MPCP_TQ_OPERATIONS);
   behavior seize_free:
     assumes MPCP_Owner(mpcp) == NULL && Executing_Priority >= MPCP_Localceiling(mpcp);
     ensures MPCP_Owner(mpcp) == executing;
@@ -184,6 +189,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Wait_for_ownership(
     ensures MPCP_Ceiling(mpcp) == MPCP_Localceiling(mpcp);
     ensures PriorityInherited(executing, MPCP_Ceiling(mpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior seize_wait:
     assumes MPCP_Owner(mpcp) != NULL
       && MPCP_Owner(mpcp) != executing
@@ -195,6 +201,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Wait_for_ownership(
     ensures MPCP_Ceiling(mpcp) == MPCP_Localceiling(mpcp);
     ensures PriorityInherited(executing, MPCP_Ceiling(mpcp));
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior seize_no_wait_not_free:
     assumes MPCP_Owner(mpcp) != NULL
       && MPCP_Owner(mpcp) != executing
@@ -202,15 +209,18 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Wait_for_ownership(
       && !wait;
     ensures MPCP_Owner(mpcp) == \old(MPCP_Owner(mpcp));
     ensures \result == STATUS_UNAVAILABLE;
+    assigns \nothing;
   behavior seize_fail_selfowned:
     assumes MPCP_Owner(mpcp) == executing;
     ensures MPCP_Owner(mpcp) == \old(MPCP_Owner(mpcp));
     ensures \result == STATUS_UNAVAILABLE;
+    assigns \nothing;
   behavior seize_fail_ceiling:
     assumes Executing_Priority < MPCP_Localceiling(mpcp)
       && MPCP_Owner(mpcp) != executing;
     ensures MPCP_Owner(mpcp) == \old(MPCP_Owner(mpcp));
     ensures \result == STATUS_MUTEX_CEILING_VIOLATED || STATUS_UNAVAILABLE;
+    assigns \nothing;
   complete behaviors;
   disjoint behaviors;
 */
@@ -223,7 +233,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Seize(
 
 /*@
   requires \valid(mpcp) && \valid(&mpcp->Wait_queue.Queue) && \valid(&mpcp->Wait_queue.Queue.heads) && \valid(executing) && \valid(queue_context) && \valid(g_homenode) && \valid(MPCP_TQ_OPERATIONS);
-  requires \separated(mpcp, executing, queue_context, g_homenode);
+  requires \separated(mpcp, executing, queue_context, g_homenode, MPCP_TQ_OPERATIONS);
   behavior surrender_no_successor:
     assumes MPCP_Owner(mpcp) == executing;
     assumes !MPCPThreadsWaiting(mpcp);
@@ -231,6 +241,7 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Seize(
     ensures PriorityRevoked(executing, MPCP_Ceiling(mpcp));
     ensures Executing_Priority >= \old(Executing_Priority);
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior surrender_successor:
     assumes MPCP_Owner(mpcp) == executing;
     assumes MPCPThreadsWaiting(mpcp);
@@ -238,9 +249,11 @@ RTEMS_INLINE_ROUTINE Status_Control _MPCP_Seize(
     ensures Executing_Priority >= \old(Executing_Priority);
     ensures MPCP_Owner(mpcp) == executing;
     ensures \result == STATUS_SUCCESSFUL;
+    assigns g_homenode->Wait.Priority.Node.priority, g_prio, queue_context->Priority.update_count;
   behavior surrender_fail:
     assumes MPCP_Owner(mpcp) != executing;
     ensures \result == STATUS_NOT_OWNER;
+    assigns \nothing;
   disjoint behaviors;
   complete behaviors;
 */
@@ -280,7 +293,7 @@ RTEMS_INLINE_ROUTINE void _Priority_Node_initialize(
 
 /*@
   requires \valid(the_thread) && \valid(priority_node) && \valid(queue_context);
-  assigns g_thread_inherited, g_prio, g_homenode->Wait.Priority.Node.priority;
+  assigns g_prio, g_homenode->Wait.Priority.Node.priority;
   ensures g_thread_inherited == the_thread && g_prio == priority_node->priority;
   ensures Executing_Priority <= \old(Executing_Priority);
   ensures Executing_Priority == priority_node->priority;
@@ -295,7 +308,7 @@ void _Thread_Priority_add(
 
 /*@
   requires \valid(the_thread) && \valid(priority_node) && \valid(queue_context) && \valid(g_homenode);
-  assigns g_homenode->Wait.Priority.Node.priority, g_thread_revoked, g_prio;
+  assigns g_homenode->Wait.Priority.Node.priority, g_prio;
   ensures g_thread_revoked == the_thread && g_prio == priority_node->priority;
   ensures Executing_Priority == priority_node->priority;
   ensures Executing_Priority > \old(Executing_Priority);
@@ -308,7 +321,8 @@ void _Thread_Priority_remove(
 
 /*@
   requires \valid(queue) && \valid(the_thread) && \valid(operations) && \valid(queue_context);
-  assigns queue->owner, prioritiesUpdated;
+  assigns queue->owner \from the_thread;
+  assigns prioritiesUpdated;
   ensures queue->owner == the_thread;
   ensures the_thread == \old(the_thread);
   ensures prioritiesUpdated;
@@ -323,7 +337,8 @@ void _Thread_queue_Enqueue(
 /*@
   requires \valid(queue) && \valid(heads) && \valid(previous_owner) && \valid(queue_context) && \valid(operations);
   requires queue->owner == NULL;
-  assigns queue->owner, prioritiesUpdated;
+  assigns queue->owner \from previous_owner;
+  assigns prioritiesUpdated;
   ensures queue->owner == g_new_owner;
   ensures prioritiesUpdated;
 */
@@ -392,12 +407,12 @@ RTEMS_INLINE_ROUTINE void _Thread_Wait_release_default(
   ISR_lock_Context *lock_context
 );
 
-//@ assigns \nothing;
+//@ assigns \result \from queue_context;
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_queue_Dispatch_disable(
   Thread_queue_Context *queue_context
 );
 
-//@ assigns \nothing;
+//@ assigns \result \from lock_context;
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_Dispatch_disable_critical(
   const ISR_lock_Context *lock_context
 );
