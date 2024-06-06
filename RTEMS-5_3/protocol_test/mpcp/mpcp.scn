@@ -1,0 +1,28 @@
+Starting test: 
+APP1 Scheduler ID 251723777
+APP2 Scheduler ID 251723778
+Processor 0 scheduler ID: 251723777
+Processor 1 scheduler ID: 251723778
+TAS2 running on CPU 0
+TAS2 obtaining SEM1
+Starting TAS4: 
+TAS4 running on CPU 1
+Starting TAS1: 
+TAS1 running on CPU 1
+TAS2 releasing SEM1
+TAS1 obtaining SEM1
+TAS2 suspending
+Starting TAS3: 
+TAS3 running on CPU 0
+TAS3 obtaining SEM2
+TAS1 releasing SEM1
+End of TAS1
+TAS4 obtaining SEM1
+TAS3 releasing SEM2
+Resuming TAS2
+TAS2 obtaining SEM2
+TAS4 releasing SEM1
+TAS2 releasing SEM2
+End of TAS2.
+End of TAS3
+End of TAS4

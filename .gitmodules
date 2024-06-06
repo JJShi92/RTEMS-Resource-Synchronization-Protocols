@@ -1,0 +1,6 @@
+[submodule "RTEMS-5_3/protocol_test/dpcp/rtems_waf"]
+	path = RTEMS-5_3/protocol_test/dpcp/rtems_waf
+	url = git://git.rtems.org/rtems_waf.git
+[submodule "RTEMS-5_3/protocol_test/mpcp/rtems_waf"]
+	path = RTEMS-5_3/protocol_test/mpcp/rtems_waf
+	url = git://git.rtems.org/rtems_waf.git

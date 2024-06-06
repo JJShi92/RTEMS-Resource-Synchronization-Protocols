@@ -7,7 +7,7 @@ protocol_tests are some test cases that can be used to verify the features of di
 ## Supported Protocols:
 DPCP, MPCP, FMLP, DFLP, and beta version of HDGA.
 <br />
-## HowTo:
+## How-to:
 This patch is based on the original RTEMS from commit c1a1f2c8da4993b03f0a8fadac8f0521df48abec.
 <br />
 Please download the RTEMS from its original release site (https://github.com/RTEMS/rtems), and then apply our patch.
@@ -25,14 +25,17 @@ The compilation of RTEMS is based on the guide: [T4240RDB Deployment Guide](http
 The deployment details can be found in 'Deploy to T4240rdb'.<br />
 We also provide the template file of t4240rdb.dtb.<br />
 
-# RTEMS-5 Support:
+# RTEMS-5.1 Support:
 We support aforementationed protocols for official release of RTEMS-5.1 (in folder RTEMS-5). In addition, the implementation for DGA has been formally verified (by Surya Subramanian).
 <br />
+
+
 ## Protocols Support:
 The patch `RTEMS_file.patch` can be applied to the downloaded RTEMS-5.1, and enter the `rtems` folder, by executing `patch -p1 < RTEMS_file.patch`.
 <br />
 The compilation of RTEMS based on qemu can refer to [RTEMS Compilation Guide](https://es-rtos-kh.blogspot.com/2020/06/rsbrtems-5-with-qemu-smp.html).
 <br />
+
 ## Formal Verification:
 The detailed deployment for verification can refer to [Protocol_Verification](https://github.com/JJShi92/Resource-Synchronization-Protocols-Verification-RTEMS). The detailed steps are as follows:
 1. RTEMS Installation:
@@ -76,3 +79,25 @@ The detailed deployment for verification can refer to [Protocol_Verification](ht
       -I/home/YOUR_DIC/build/powerpc-rtems5/include \
       -nostdinc -include hdga_contracts_t.h' -machdep ppc_32 -cpp-frama-c-compliant -c11       include/rtems/score/hdgaimpl.h
       ```
+
+
+# RTEMS-5.3 Support:
+## Supported Protocols:
+DPCP, MPCP
+
+## How-to: 
+The RTEMS-5.3 Patch is based on the 5.3 tag from the original RTEMS source(http://github.com/RTEMS/rtems). To download the source using git run:
+
+      git clone https://github.com/RTEMS/rtems.git
+      cd rtems
+      git checkout tags/5.3
+
+then apply the patch from the `RTEMS-5_3` folder:
+
+      patch -p1 < RTEMS_patch_DPCP_MPCP.patch
+
+## Test suites:
+Test suites for DPCP and MPCP on RTEMS-5.3 can be found in `protocol_test` inside the `RTEMS-5_3` folder. 
+
+## Formal Verification:
+Verifications are provided for both DPCP and MPCP in the `RTEMS-5_3/verifications` directory.  
