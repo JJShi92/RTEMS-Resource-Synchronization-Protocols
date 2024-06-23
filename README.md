@@ -100,4 +100,4 @@ then apply the patch from the `RTEMS-5_3` folder:
 Test suites for DPCP and MPCP on RTEMS-5.3 can be found in `protocol_test` inside the `RTEMS-5_3` folder. 
 
 ## Formal Verification:
-Verifications are provided for both DPCP and MPCP in the `RTEMS-5_3/verifications` directory.  
+Verifications are provided for both DPCP and MPCP in the `RTEMS-5_3/verifications` directory. Follow the same directions for the verification as above however only modificaton to the `cpustdatomic.h` file in step 3 is needed. 
